@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useCreateCommentMutation } from "@/src/hooks/useCreateComment";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function formatDate(iso?: string) {
   if (!iso) return "";
@@ -42,6 +43,8 @@ const PostDetailScreen = () => {
   const images = useMemo(() => data?.imageUrls ?? [], [data?.imageUrls]);
   const [index, setIndex] = useState(0);
   const [commentText, setCommentText] = useState("");
+
+  const insets = useSafeAreaInsets();
 
   const { mutateAsync: addComment, isPending: adding } =
     useCreateCommentMutation(id);
@@ -84,112 +87,119 @@ const PostDetailScreen = () => {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? insets.bottom : 0}
     >
-      <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.title}>{data.title}</Text>
-
-        <Text style={styles.meta}>
-          {authorName} · {formatDate(createdAt)}
-        </Text>
-
-        {images.length > 0 && (
-          <View style={[styles.carouselWrap, { width }]}>
-            <FlatList
-              data={images}
-              keyExtractor={(uri, i) => `${uri}-${i}`}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={onScroll}
-              scrollEventThrottle={16}
-              renderItem={({ item: uri }) => (
-                <Image
-                  source={{ uri }}
-                  style={[styles.image, { width }]}
-                  resizeMode="cover"
-                />
-              )}
-            />
-            <View style={styles.pageBadge}>
-              <Text style={styles.pageBadgeText}>
-                {index + 1} / {images.length}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        <Text style={styles.content}>{data.content}</Text>
-
-        {/* 구분선 */}
-        <View style={styles.hr} />
-
-        <Text style={styles.sectionTitle}>
-          댓글 {data.comments?.length ?? 0}
-        </Text>
-
-        {!data.comments || data.comments.length === 0 ? (
-          <Text style={styles.empty}>아직 댓글이 없어요.</Text>
-        ) : (
-          <View style={{ gap: 12 }}>
-            {data.comments.map((c) => {
-              const cAuthor = c.author?.username ?? "익명";
-              const cAvatar =
-                (c.author as any)?.avatarUrl || (c.author as any)?.avatar_url;
-              const cDate = (c as any).createdAt ?? (c as any).created_at;
-              return (
-                <View key={c.id} style={styles.commentRow}>
-                  {cAvatar ? (
-                    <Image source={{ uri: cAvatar }} style={styles.avatar} />
-                  ) : (
-                    <View style={[styles.avatar, styles.avatarFallback]}>
-                      <Text style={{ color: "#fff", fontSize: 12 }}>
-                        {cAuthor.slice(0, 1)}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.commentHeader}>
-                      <Text style={styles.commentAuthor}>{cAuthor}</Text>
-                      <Text style={styles.commentDate}>
-                        {formatDate(cDate)}
-                      </Text>
-                    </View>
-                    <Text style={styles.commentBody}>{c.body}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
-
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          placeholder="댓글을 입력하세요"
-          value={commentText}
-          onChangeText={setCommentText}
-          editable={!adding}
-          returnKeyType="send"
-          onSubmitEditing={submitComment}
-        />
-        <TouchableOpacity
-          style={[
-            styles.sendBtn,
-            (!commentText.trim() || adding) && { opacity: 0.5 },
-          ]}
-          onPress={submitComment}
-          disabled={!commentText.trim() || adding}
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 16 }}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.sendBtnText}>
-            {adding ? "등록중..." : "등록"}
+          <Text style={styles.title}>{data.title}</Text>
+
+          <Text style={styles.meta}>
+            {authorName} · {formatDate(createdAt)}
           </Text>
-        </TouchableOpacity>
+
+          {images.length > 0 && (
+            <View style={[styles.carouselWrap, { width }]}>
+              <FlatList
+                data={images}
+                keyExtractor={(uri, i) => `${uri}-${i}`}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={onScroll}
+                scrollEventThrottle={16}
+                renderItem={({ item: uri }) => (
+                  <Image
+                    source={{ uri }}
+                    style={[styles.image, { width }]}
+                    resizeMode="cover"
+                  />
+                )}
+              />
+              <View style={styles.pageBadge}>
+                <Text style={styles.pageBadgeText}>
+                  {index + 1} / {images.length}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <Text style={styles.content}>{data.content}</Text>
+
+          {/* 구분선 */}
+          <View style={styles.hr} />
+
+          <Text style={styles.sectionTitle}>
+            댓글 {data.comments?.length ?? 0}
+          </Text>
+
+          {!data.comments || data.comments.length === 0 ? (
+            <Text style={styles.empty}>아직 댓글이 없어요.</Text>
+          ) : (
+            <View style={{ gap: 12 }}>
+              {data.comments.map((c) => {
+                const cAuthor = c.author?.username ?? "익명";
+                const cAvatar =
+                  (c.author as any)?.avatarUrl || (c.author as any)?.avatar_url;
+                const cDate = (c as any).createdAt ?? (c as any).created_at;
+                return (
+                  <View key={c.id} style={styles.commentRow}>
+                    {cAvatar ? (
+                      <Image source={{ uri: cAvatar }} style={styles.avatar} />
+                    ) : (
+                      <View style={[styles.avatar, styles.avatarFallback]}>
+                        <Text style={{ color: "#fff", fontSize: 12 }}>
+                          {cAuthor.slice(0, 1)}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.commentHeader}>
+                        <Text style={styles.commentAuthor}>{cAuthor}</Text>
+                        <Text style={styles.commentDate}>
+                          {formatDate(cDate)}
+                        </Text>
+                      </View>
+                      <Text style={styles.commentBody}>{c.body}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+
+        <View
+          style={[
+            styles.inputBar,
+            { paddingBottom: Math.max(insets.bottom, 12) },
+          ]}
+        >
+          <TextInput
+            style={styles.input}
+            placeholder="댓글을 입력하세요"
+            value={commentText}
+            onChangeText={setCommentText}
+            editable={!adding}
+            returnKeyType="send"
+            onSubmitEditing={submitComment}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendBtn,
+              (!commentText.trim() || adding) && { opacity: 0.5 },
+            ]}
+            onPress={submitComment}
+            disabled={!commentText.trim() || adding}
+          >
+            <Text style={styles.sendBtnText}>
+              {adding ? "등록중..." : "등록"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
