@@ -13,7 +13,7 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter, Href } from "expo-router";
+import { useRouter } from "expo-router";
 import { useAuthStore } from "@/src/store/auth";
 import LoginRequired from "@/src/components/LoginRequired";
 import { useCreatePostMutation } from "@/src/hooks/useCreatePost";
@@ -68,7 +68,7 @@ export default function CreatePostScreen() {
         content: content.trim(),
         files: blobs,
       });
-      router.replace(`/post/${p.id}` as Href);
+      router.replace(`/post/${p.id}`);
     } catch (e: any) {
       Alert.alert("작성 실패", e?.message ?? "다시 시도해 주세요.");
     } finally {
