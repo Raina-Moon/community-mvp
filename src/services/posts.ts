@@ -2,6 +2,7 @@ import { supabase } from "../lib/supabase";
 import { Post } from "../types/post";
 import { toPostBase, toUser, toComment } from "../lib/mappers";
 import type { Comment as CommentType } from "../types/comment";
+import { v4 as uuidv4 } from 'uuid';
 
 export async function listPostsSimple(page = 1, size = 10): Promise<Post[]> {
   const from = (page - 1) * size;
@@ -41,7 +42,7 @@ export async function listPostsSimple(page = 1, size = 10): Promise<Post[]> {
   return bases.map((base) => {
     const path = latestPathByPost.get(base.id);
     const firstUrl = path
-      ? supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl
+      ? supabase.storage.from("post_images").getPublicUrl(path).data.publicUrl
       : undefined;
     const author = authorMap.get(base.authorId);
 
@@ -75,7 +76,7 @@ export async function getPostSimple(id: string): Promise<Post> {
   const imageUrls =
     images?.map(
       (i) =>
-        supabase.storage.from("post-images").getPublicUrl(i.path).data.publicUrl
+        supabase.storage.from("post_images").getPublicUrl(i.path).data.publicUrl
     ) ?? [];
 
   const { data: author } = await supabase
@@ -141,11 +142,14 @@ export async function createPost(params: {
   if (params.files?.length) {
     const paths: string[] = [];
     for (const blob of params.files) {
-      const filename = `${crypto.randomUUID()}.jpg`;
+      const filename = `${uuidv4()}.jpg`;
       const path = `${user.id}/${filename}`;
       const up = await supabase.storage
-        .from("post-images")
-        .upload(path, blob, { upsert: false });
+  .from("post_images")
+  .upload(path, blob, {
+    upsert: false,
+    contentType: (blob as any).type || 'image/jpeg',
+  });
       if (up.error) throw up.error;
       paths.push(path);
     }
