@@ -20,7 +20,12 @@ export default function SignInScreen() {
   const [submitting, setSubmitting] = useState(false); // ✅ 로컬 로딩
 
   const goAfterLogin = () => {
-    if (typeof redirect === "string" && redirect.startsWith("/post/")) {
+    if (redirect === "/post/create") {
+      router.replace("/post/create");
+    } else if (
+      typeof redirect === "string" &&
+      /^\/post\/[^/]+$/.test(redirect)
+    ) {
       const id = redirect.split("/").pop()!;
       router.replace({ pathname: "/post/[id]", params: { id } });
     } else {

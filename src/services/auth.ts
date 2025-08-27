@@ -1,12 +1,12 @@
 import { supabase } from "../lib/supabase";
 
 export async function isUsernameAvailable(username: string) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("username", username);
+   const { error, count } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .eq('username', username);
   if (error) throw error;
-  return (data?.length ?? 0) === 0;
+  return (count ?? 0) === 0;
 }
 
 export async function signUp(
