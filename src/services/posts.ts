@@ -2,7 +2,8 @@ import { supabase } from "../lib/supabase";
 import { Post } from "../types/post";
 import { toPostBase, toUser, toComment } from "../lib/mappers";
 import type { Comment as CommentType } from "../types/comment";
-import { v4 as uuidv4 } from 'uuid';
+
+type UploadPart = { name: string; type: string; buffer: ArrayBuffer };
 
 export async function listPostsSimple(page = 1, size = 10): Promise<Post[]> {
   const from = (page - 1) * size;
@@ -116,7 +117,7 @@ export async function getPostSimple(id: string): Promise<Post> {
 export async function createPost(params: {
   title: string;
   content: string;
-  files?: Blob[];
+  files?: UploadPart[];
 }) {
   const {
     data: { session },
@@ -139,31 +140,28 @@ export async function createPost(params: {
 
   const base = toPostBase(row);
 
-  if (params.files?.length) {
+   if (params.files?.length) {
     const paths: string[] = [];
-    for (const blob of params.files) {
-      const filename = `${uuidv4()}.jpg`;
-      const path = `${user.id}/${filename}`;
+    for (const f of params.files) {
+      const path = `${user.id}/${f.name}`;
       const up = await supabase.storage
-  .from("post_images")
-  .upload(path, blob, {
-    upsert: false,
-    contentType: (blob as any).type || 'image/jpeg',
-  });
+        .from("post_images")                     
+        .upload(path, f.buffer, {                 
+          upsert: false,
+          contentType: f.type || "image/jpeg",
+          cacheControl: "3600",
+        });
       if (up.error) throw up.error;
       paths.push(path);
     }
-    const rows = paths.map((path) => ({
-      post_id: base.id,
-      author_id: user.id,
-      path,
-    }));
-    const { error: merr } = await supabase.from("post_images").insert(rows);
+
+    const { error: merr } = await supabase
+      .from("post_images")
+      .insert(paths.map((path) => ({ post_id: base.id, author_id: user.id, path })));
     if (merr) throw merr;
   }
 
-  const post: Post = { ...base, imageUrls: [], comments: [] };
-  return post;
+  return { ...base, imageUrls: [], comments: [] } as Post;
 }
 
 export async function createComment(postId: string, body: string) {
