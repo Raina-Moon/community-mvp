@@ -6,11 +6,12 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "types": ["expo-router/types"]
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*",                 
+    "src/**/*",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ]
