@@ -13,10 +13,13 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter, Href } from "expo-router";
+import { useRouter } from "expo-router";
 import { useAuthStore } from "@/src/store/auth";
 import LoginRequired from "@/src/components/LoginRequired";
 import { useCreatePostMutation } from "@/src/hooks/useCreatePost";
+import { v4 as uuidv4 } from "uuid";
+import * as FileSystem from "expo-file-system";
+import { decode } from "base64-arraybuffer";
 
 export default function CreatePostScreen() {
   const router = useRouter();
@@ -38,19 +41,43 @@ export default function CreatePostScreen() {
   }
 
   const pickImages = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 0.9,
-    });
-    if (!res.canceled) setAssets((prev) => [...prev, ...res.assets]);
-  };
-
+  const res = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsMultipleSelection: true,
+    quality: 0.9,
+    base64: true,              
+  });
+  if (!res.canceled) setAssets(prev => [...prev, ...res.assets]);
+};
   const removeAt = (idx: number) =>
     setAssets((prev) => prev.filter((_, i) => i !== idx));
 
-  const toBlobs = async (uris: string[]) =>
-    Promise.all(uris.map(async (uri) => (await fetch(uri)).blob()));
+  const extFromMime = (mime?: string) => {
+  if (!mime) return "jpg";
+  const m = mime.split("/")[1];
+  return (m === "jpeg" ? "jpg" : m) || "jpg";
+};
+
+  const toUploads = async (assets: ImagePicker.ImagePickerAsset[]) => {
+  return Promise.all(
+    assets.map(async (a) => {
+      const type = a.mimeType || "image/jpeg";
+      const ext = extFromMime(a.mimeType);
+      const name = `${uuidv4()}.${ext}`;
+
+      let b64 = a.base64;
+
+      if (!b64) {
+        b64 = await FileSystem.readAsStringAsync(a.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
+
+      const buffer = decode(b64!);
+      return { name, type, buffer };
+    })
+  );
+};
 
   const onSubmit = async () => {
     if (submitting) return;
@@ -60,21 +87,19 @@ export default function CreatePostScreen() {
     }
     setSubmitting(true);
     try {
-      const blobs = assets.length
-        ? await toBlobs(assets.map((a) => a.uri))
-        : undefined;
-      const p = await mutateAsync({
-        title: title.trim(),
-        content: content.trim(),
-        files: blobs,
-      });
-      router.replace(`/post/${p.id}` as Href);
-    } catch (e: any) {
-      Alert.alert("작성 실패", e?.message ?? "다시 시도해 주세요.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    const files = assets.length ? await toUploads(assets) : undefined;
+    const p = await mutateAsync({
+      title: title.trim(),
+      content: content.trim(),
+      files,
+    });
+    router.replace({ pathname: "/post/[id]", params: { id: p.id } });
+  } catch (e: any) {
+    Alert.alert("작성 실패", e?.message ?? "다시 시도해 주세요.");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   return (
     <KeyboardAvoidingView

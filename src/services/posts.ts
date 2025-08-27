@@ -3,6 +3,8 @@ import { Post } from "../types/post";
 import { toPostBase, toUser, toComment } from "../lib/mappers";
 import type { Comment as CommentType } from "../types/comment";
 
+type UploadPart = { name: string; type: string; buffer: ArrayBuffer };
+
 export async function listPostsSimple(page = 1, size = 10): Promise<Post[]> {
   const from = (page - 1) * size;
   const to = from + size - 1;
@@ -41,7 +43,7 @@ export async function listPostsSimple(page = 1, size = 10): Promise<Post[]> {
   return bases.map((base) => {
     const path = latestPathByPost.get(base.id);
     const firstUrl = path
-      ? supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl
+      ? supabase.storage.from("post_images").getPublicUrl(path).data.publicUrl
       : undefined;
     const author = authorMap.get(base.authorId);
 
@@ -75,7 +77,7 @@ export async function getPostSimple(id: string): Promise<Post> {
   const imageUrls =
     images?.map(
       (i) =>
-        supabase.storage.from("post-images").getPublicUrl(i.path).data.publicUrl
+        supabase.storage.from("post_images").getPublicUrl(i.path).data.publicUrl
     ) ?? [];
 
   const { data: author } = await supabase
@@ -115,7 +117,7 @@ export async function getPostSimple(id: string): Promise<Post> {
 export async function createPost(params: {
   title: string;
   content: string;
-  files?: Blob[];
+  files?: UploadPart[];
 }) {
   const {
     data: { session },
@@ -138,28 +140,28 @@ export async function createPost(params: {
 
   const base = toPostBase(row);
 
-  if (params.files?.length) {
+   if (params.files?.length) {
     const paths: string[] = [];
-    for (const blob of params.files) {
-      const filename = `${crypto.randomUUID()}.jpg`;
-      const path = `${user.id}/${filename}`;
+    for (const f of params.files) {
+      const path = `${user.id}/${f.name}`;
       const up = await supabase.storage
-        .from("post-images")
-        .upload(path, blob, { upsert: false });
+        .from("post_images")                     
+        .upload(path, f.buffer, {                 
+          upsert: false,
+          contentType: f.type || "image/jpeg",
+          cacheControl: "3600",
+        });
       if (up.error) throw up.error;
       paths.push(path);
     }
-    const rows = paths.map((path) => ({
-      post_id: base.id,
-      author_id: user.id,
-      path,
-    }));
-    const { error: merr } = await supabase.from("post_images").insert(rows);
+
+    const { error: merr } = await supabase
+      .from("post_images")
+      .insert(paths.map((path) => ({ post_id: base.id, author_id: user.id, path })));
     if (merr) throw merr;
   }
 
-  const post: Post = { ...base, imageUrls: [], comments: [] };
-  return post;
+  return { ...base, imageUrls: [], comments: [] } as Post;
 }
 
 export async function createComment(postId: string, body: string) {
