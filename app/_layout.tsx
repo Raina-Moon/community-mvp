@@ -1,3 +1,4 @@
+import BottomActionBar from "@/src/components/BottomActionBar";
 import { useAuthStore } from "@/src/store/auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
@@ -20,6 +21,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={qc}>
         <Stack screenOptions={{ headerShown: false }} />
+        <BottomActionBar />
       </QueryClientProvider>
     </SafeAreaProvider>
   );
