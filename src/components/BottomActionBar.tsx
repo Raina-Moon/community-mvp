@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const BAR_HEIGHT = 64;
@@ -9,7 +9,12 @@ const FAB_SIZE = 64;
 export default function BottomActionBar() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const pathname = usePathname()
 
+  if(pathname?.startsWith('/auth')  || pathname === "/post/create") {
+    return null;
+  }
+  
   const goCreate = () => {
     router.push('/post/create');
   };
