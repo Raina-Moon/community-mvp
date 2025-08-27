@@ -2,11 +2,34 @@ import 'react-native-get-random-values';
 import BottomActionBar from "@/src/components/BottomActionBar";
 import { useAuthStore } from "@/src/store/auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { useEffect } from "react";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
+import { View } from 'react-native';
 
 const qc = new QueryClient();
+const BAR_HEIGHT = 64;
+const BAR_BOTTOM_PADDING = 12;
+
+function LayoutInner() {
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname() ?? "";
+
+  const showBar = !(pathname.startsWith('/auth') || pathname === '/post/create');
+
+  const contentPaddingBottom = showBar
+    ? BAR_HEIGHT + Math.max(insets.bottom, BAR_BOTTOM_PADDING)
+    : Math.max(insets.bottom, 0);
+
+  return (
+    <>
+      <View style={{ flex: 1, paddingBottom: contentPaddingBottom }}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </View>
+      <BottomActionBar />
+    </>
+  );
+}
 
 export default function RootLayout() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
@@ -21,8 +44,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={qc}>
-        <Stack screenOptions={{ headerShown: false }} />
-        <BottomActionBar />
+        <LayoutInner />
       </QueryClientProvider>
     </SafeAreaProvider>
   );
