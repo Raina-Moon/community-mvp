@@ -15,10 +15,15 @@ type AuthState = {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
 
-  bootstrap() {
-    AuthSvc.getCurrentUser()
-      .then((u) => set({ user: u ?? null }))
-      .catch(() => set({ user: null }));
+  async bootstrap() {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      set({ user: session?.user ?? null });
+    } catch {
+      set({ user: null });
+    }
   },
 
   subscribeAuth() {
