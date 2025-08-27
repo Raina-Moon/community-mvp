@@ -1,3 +1,4 @@
+import 'react-native-get-random-values';
 import BottomActionBar from "@/src/components/BottomActionBar";
 import { useAuthStore } from "@/src/store/auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
