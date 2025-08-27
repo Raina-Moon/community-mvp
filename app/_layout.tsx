@@ -9,7 +9,6 @@ import { View } from 'react-native';
 
 const qc = new QueryClient();
 const BAR_HEIGHT = 64;
-const BAR_BOTTOM_PADDING = 12;
 
 function LayoutInner() {
   const insets = useSafeAreaInsets();
@@ -18,7 +17,7 @@ function LayoutInner() {
   const showBar = !(pathname.startsWith('/auth') || pathname === '/post/create');
 
   const contentPaddingBottom = showBar
-    ? BAR_HEIGHT + Math.max(insets.bottom, BAR_BOTTOM_PADDING)
+    ? BAR_HEIGHT + Math.max(insets.bottom)
     : Math.max(insets.bottom, 0);
 
   return (
