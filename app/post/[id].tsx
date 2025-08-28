@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import LoginRequired from "@/src/components/LoginRequired";
 import { usePostQuery } from "@/src/hooks/usePosts";
 import { useAuthStore } from "@/src/store/auth";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   FlatList,
@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { useCreateCommentMutation } from "@/src/hooks/useCreateComment";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useDeletePostMutation } from "@/src/hooks/useDeletePost";
 
 function formatDate(iso?: string) {
   if (!iso) return "";
@@ -36,9 +37,15 @@ const PostDetailScreen = () => {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id ?? "";
   const user = useAuthStore((s) => s.user);
+  const router = useRouter();
 
   const { data, isLoading } = usePostQuery(id);
   const { width } = useWindowDimensions();
+
+  const isMine = user?.id && data?.authorId === user.id;
+
+  const { mutateAsync: removePost, isPending: removing } =
+    useDeletePostMutation(id);
 
   const images = useMemo(() => data?.imageUrls ?? [], [data?.imageUrls]);
   const [index, setIndex] = useState(0);
@@ -84,6 +91,24 @@ const PostDetailScreen = () => {
     }
   };
 
+  const confirmDelete = () => {
+    Alert.alert("삭제할까요?", "삭제하면 되돌릴 수 없습니다.", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await removePost();
+            router.replace("/");
+          } catch (e: any) {
+            Alert.alert("삭제 실패", e?.message ?? "다시 시도해 주세요.");
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -96,6 +121,38 @@ const PostDetailScreen = () => {
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.title}>{data.title}</Text>
+
+          {isMine && (
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+              <TouchableOpacity
+                onPress={() =>
+                  router.push(`/post/edit/${id}`)
+                }
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  backgroundColor: "#eee",
+                  borderRadius: 8,
+                }}
+              >
+                <Text>수정</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={confirmDelete}
+                disabled={removing}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  backgroundColor: "#ffefef",
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ color: "#c00" }}>
+                  {removing ? "삭제중..." : "삭제"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <Text style={styles.meta}>
             {authorName} · {formatDate(createdAt)}
