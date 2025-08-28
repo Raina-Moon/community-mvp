@@ -4,26 +4,27 @@ import { Comment } from "../types/comment";
 
 type ProfileRow = {
   id: string;
-  email: string | null;
   username: string | null;
   created_at: string;
 };
+
+type PostImageRow = { path: string; sort: number | null };
 
 type PostRow = {
   id: string;
   title: string;
   content: string;
-  authorId: string;
+  author_id: string;
   created_at: string;
   updated_at: string;
-  imageUrls: string[] | null;
+  post_images?: PostImageRow[];
 };
 
 type CommentRow = {
   id: string;
-  postId: string;
+  post_id: string;
   body: string;
-  authorId: string;
+  author_id: string;
   created_at: string;
 };
 
@@ -31,25 +32,27 @@ const mapPost = (r: PostRow): Post => ({
   id: r.id,
   title: r.title,
   content: r.content,
-  authorId: r.authorId,
+  authorId: r.author_id,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
-  imageUrls: r.imageUrls ?? [],
+  imageUrls: (r.post_images ?? [])
+    .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+    .map((i) => i.path),
   comments: [],
 });
 
 const mapComment = (r: CommentRow): Comment => ({
   id: r.id,
-  postId: r.postId,
+  postId: r.post_id,
   body: r.body,
-  authorId: r.authorId,
+  authorId: r.author_id,
   createdAt: r.created_at,
 });
 
 export async function getMyProfile(userId: string) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, username, created_at")
+    .select("id, username, created_at")
     .eq("id", userId)
     .single<ProfileRow>();
 
@@ -57,7 +60,6 @@ export async function getMyProfile(userId: string) {
 
   return {
     id: data.id,
-    email: data.email ?? undefined,
     username: data.username,
     createdAt: data.created_at,
   };
@@ -66,8 +68,10 @@ export async function getMyProfile(userId: string) {
 export async function getMyPosts(userId: string) {
   const { data, error } = await supabase
     .from("posts")
-    .select("id, title, content, authorId, created_at, updated_at, imageUrls")
-    .eq("authorId", userId)
+    .select(
+      "id, title, content, author_id, created_at, updated_at, post_images(path, sort)"
+    )
+    .eq("author_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -78,8 +82,8 @@ export async function getMyPosts(userId: string) {
 export async function getMyComments(userId: string) {
   const { data, error } = await supabase
     .from("comments")
-    .select("id, body, created_at, postId, authorId")
-    .eq("authorId", userId)
+    .select("id, body, created_at, post_id, author_id")
+    .eq("author_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
