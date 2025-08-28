@@ -52,15 +52,24 @@ export async function updateComment(commentId: string, body: string) {
   } = await supabase.auth.getSession();
   if (!session) throw new Error("로그인이 만료되었어요. 다시 로그인 해 주세요.");
 
-  const { error } = await supabase
+  const { data: own, error: sErr } = await supabase
+    .from("comments")
+    .select("id")
+    .eq("id", commentId)
+    .eq("author_id", session.user.id)
+    .maybeSingle();
+  if (sErr) throw sErr;
+  if (!own) throw new Error("본인 댓글만 수정할 수 있어요.");
+
+  const { error: uErr } = await supabase
     .from("comments")
     .update({ body })
-    .eq("id", commentId)
-    .eq("author_id", session.user.id);
+    .eq("id", commentId);
+  if (uErr) throw uErr;
 
-  if (error) throw error;
   return true;
 }
+
 
 export async function deleteComment(commentId: string) {
   const {
