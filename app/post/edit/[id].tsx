@@ -159,7 +159,11 @@ const PostEditScreen = () => {
     if (isExisting(item)) {
       setRemovePaths((prev) => {
         const next = new Set(prev);
-        next.has(item.path) ? next.delete(item.path) : next.add(item.path);
+        if (next.has(item.path)) {
+          next.delete(item.path);
+        } else {
+          next.add(item.path);
+        }
         return next;
       });
     } else {
@@ -181,12 +185,18 @@ const PostEditScreen = () => {
     const addOrderNames = gallery
       .filter((g) => g.kind === "new")
       .map((g) => (g as any).name as string);
+
     const addFilesOrdered =
       addOrderNames.length === addFiles.length
         ? addOrderNames
             .map((nm) => addFiles.find((f) => f.name === nm)!)
             .filter(Boolean)
         : addFiles;
+
+    const reorderPaths = gallery
+      .filter((g) => g.kind === "existing")
+      .map((g) => (g as any).path as string)
+      .filter((p) => !removePaths.has(p));
 
     try {
       await updatePost({
@@ -195,6 +205,7 @@ const PostEditScreen = () => {
         content: content.trim(),
         addFiles: addFilesOrdered.length ? addFilesOrdered : undefined,
         removePaths: removePaths.size ? Array.from(removePaths) : undefined,
+        reorderPaths,
       });
 
       Alert.alert("완료", "수정되었습니다.", [
@@ -240,52 +251,54 @@ const PostEditScreen = () => {
         {gallery.length > 0 && (
           <>
             <Text style={styles.section}>이미지 (꾹 눌러 순서 변경)</Text>
+
             <DraggableFlatList<GalleryItem>
               data={gallery}
               keyExtractor={(item) => item.key}
+              horizontal
+              showsHorizontalScrollIndicator={false}
               onDragEnd={({ data }) => setGallery(data)}
+              activationDistance={10}
               dragItemOverflow
-              numColumns={3}
-              scrollEnabled={false}
-              activationDistance={12}
-              onDragBegin={() => console.log("drag start")}
-              onPlaceholderIndexChange={(i) => console.log("placeholder", i)}
-              columnWrapperStyle={{ justifyContent: "flex-start" }}
-              containerStyle={{ paddingVertical: 4 }}
-              renderItem={({ item, drag, isActive }) => {
+              contentContainerStyle={{ paddingVertical: 4, marginBottom: 12 }}
+              renderItem={({ item, drag, isActive, getIndex }) => {
                 const marked = isExisting(item) && removePaths.has(item.path);
 
                 return (
                   <ScaleDecorator>
-                    <Pressable
-                      onLongPress={drag}
-                      delayLongPress={150}
-                      disabled={isActive}
-                      style={{ margin: 4 }}
-                    >
+                    <View style={{ marginRight: 8 }}>
                       <View style={{ position: "relative" }}>
-                        <Image
-                          source={{ uri: item.uri }}
-                          style={[styles.thumb, isActive && { opacity: 0.8 }]}
-                        />
+                        <Pressable
+                          onLongPress={drag}
+                          delayLongPress={160}
+                          disabled={isActive}
+                          style={{ borderRadius: 8, overflow: "hidden" }}
+                        >
+                          <Image
+                            source={{ uri: item.uri }}
+                            style={[styles.thumb, isActive && { opacity: 0.8 }]}
+                          />
+                        </Pressable>
+
                         {marked && (
-                          <View style={styles.overlay}>
+                          <View pointerEvents="none" style={styles.overlay}>
                             <Text style={{ color: "#fff", fontWeight: "700" }}>
                               삭제
                             </Text>
                           </View>
                         )}
-                        <TouchableOpacity
-                          style={styles.remove}
+
+                        <Pressable
                           onPress={() => onPressRemove(item)}
-                          hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                          style={[styles.remove, { zIndex: 2 }]}
                         >
                           <Text style={{ color: "#fff", fontWeight: "700" }}>
                             ×
                           </Text>
-                        </TouchableOpacity>
+                        </Pressable>
                       </View>
-                    </Pressable>
+                    </View>
                   </ScaleDecorator>
                 );
               }}
