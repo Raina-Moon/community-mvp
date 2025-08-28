@@ -304,18 +304,3 @@ export async function deletePost(id: string) {
 
   return true;
 }
-
-export async function createComment(postId: string, body: string) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { data, error } = await supabase
-    .from("comments")
-    .insert({ post_id: postId, author_id: user.id, body })
-    .select("id,post_id,author_id,body,created_at")
-    .single();
-  if (error) throw error;
-  return data;
-}
