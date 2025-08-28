@@ -164,6 +164,94 @@ export async function createPost(params: {
   return { ...base, imageUrls: [], comments: [] } as Post;
 }
 
+export async function updatePost(params: {
+  id: string;
+  title?: string;
+  content?: string;
+  addFiles?: UploadPart[];   
+  removePaths?: string[];   
+}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('로그인이 만료되었어요. 다시 로그인 해 주세요.');
+  const user = session.user;
+
+  if (params.title || params.content) {
+    const { error: uerr } = await supabase
+      .from('posts')
+      .update({
+        ...(params.title !== undefined ? { title: params.title } : {}),
+        ...(params.content !== undefined ? { content: params.content } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.id)
+      .eq('author_id', user.id);
+    if (uerr) throw uerr;
+  }
+
+  if (params.removePaths?.length) {
+    const rem = await supabase.storage.from('post_images').remove(params.removePaths);
+    if (rem.error) throw rem.error;
+
+    const { error: derr } = await supabase
+      .from('post_images')
+      .delete()
+      .in('path', params.removePaths)
+      .eq('post_id', params.id)
+      .eq('author_id', user.id);
+    if (derr) throw derr;
+  }
+
+  if (params.addFiles?.length) {
+    const paths: string[] = [];
+    for (const f of params.addFiles) {
+      const path = `${user.id}/${f.name}`;
+      const up = await supabase.storage
+        .from('post_images')
+        .upload(path, f.buffer, {
+          contentType: f.type || 'image/jpeg',
+          upsert: false,
+          cacheControl: '3600',
+        });
+      if (up.error) throw up.error;
+      paths.push(path);
+    }
+
+    const rows = paths.map((p) => ({ post_id: params.id, author_id: user.id, path: p }));
+    const { error: ierr } = await supabase.from('post_images').insert(rows);
+    if (ierr) throw ierr;
+  }
+
+  return true;
+}
+
+export async function deletePost(id: string) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('로그인이 만료되었어요. 다시 로그인 해 주세요.');
+  const user = session.user;
+
+  const { data: imgs, error: ierr } = await supabase
+    .from('post_images')
+    .select('path')
+    .eq('post_id', id);
+  if (ierr) throw ierr;
+
+  const paths = (imgs ?? []).map((r) => r.path);
+  if (paths.length) {
+    const rem = await supabase.storage.from('post_images').remove(paths);
+    if (rem.error) throw rem.error;
+  }
+
+  const { error: perr } = await supabase
+    .from('posts')
+    .delete()
+    .eq('id', id)
+    .eq('author_id', user.id);
+  if (perr) throw perr;
+
+  return true;
+}
+
+
 export async function createComment(postId: string, body: string) {
   const {
     data: { user },
