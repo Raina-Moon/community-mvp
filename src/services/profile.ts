@@ -90,3 +90,25 @@ export async function getMyComments(userId: string) {
 
   return (data as CommentRow[]).map(mapComment);
 }
+
+export async function updateMyUsername(userId: string, username: string) {
+  const trimmed = (username ?? "").trim();
+  if (!trimmed) throw new Error("닉네임을 입력하세요");
+  if (trimmed.length < 2 || trimmed.length > 20) {
+    throw new Error("닉네임은 2~20자로 입력하세요");
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ username: trimmed })
+    .eq("id", userId);
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("이미 사용 중인 닉네임입니다");
+    }
+    throw error;
+  }
+
+  return { ok: true, username: trimmed };
+}
