@@ -1,7 +1,9 @@
 import LoginRequired from "@/src/components/LoginRequired";
 import { useDeletePostMutation } from "@/src/features/post/hooks/useDeletePost";
 import { usePostQuery } from "@/src/features/post/hooks/usePosts";
-import { useCreateCommentMutation } from "@/src/hooks/useCreateComment";
+import { useCreateCommentMutation } from "@/src/features/comment/hooks/useCreateComment";
+import { useDeleteCommentMutation } from "@/src/features/comment/hooks/useDeleteComment";
+import { useUpdateCommentMutation } from "@/src/features/comment/hooks/useUploadComment";
 import { useAuthStore } from "@/src/store/auth";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -38,11 +40,18 @@ const PostDetailScreen = () => {
   const id = Array.isArray(params.id) ? params.id[0] : params.id ?? "";
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [localBodies, setLocalBodies] = useState<Record<string, string>>({});
 
   const { data, isLoading } = usePostQuery(id);
   const { width } = useWindowDimensions();
 
   const isMine = user?.id && data?.authorId === user.id;
+
+  const { mutateAsync: updateCommentMut, isPending: updatingComment } =
+    useUpdateCommentMutation(id);
+  const { mutateAsync: deleteCommentMut, isPending: deletingComment } =
+    useDeleteCommentMutation(id);
 
   const { mutateAsync: removePost, isPending: removing } =
     useDeletePostMutation(id);
@@ -109,6 +118,37 @@ const PostDetailScreen = () => {
     ]);
   };
 
+  const startEdit = (commentId: string) => setEditingCommentId(commentId);
+  const cancelEdit = () => setEditingCommentId(null);
+
+  const saveEdit = async (commentId: string, body: string) => {
+    const next = body.trim();
+    if (!next) return Alert.alert("알림", "내용을 입력하세요");
+    try {
+      await updateCommentMut({ commentId, body: next });
+      setEditingCommentId(null);
+    } catch (e: any) {
+      Alert.alert("수정 실패", e?.message ?? "다시 시도해 주세요.");
+    }
+  };
+
+  const confirmDeleteComment = (commentId: string) => {
+    Alert.alert("삭제할까요?", "댓글은 되돌릴 수 없습니다.", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteCommentMut(commentId);
+          } catch (e: any) {
+            Alert.alert("삭제 실패", e?.message ?? "다시 시도해 주세요.");
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -125,9 +165,7 @@ const PostDetailScreen = () => {
           {isMine && (
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
               <TouchableOpacity
-                onPress={() =>
-                  router.push(`/post/edit/${id}`)
-                }
+                onPress={() => router.push(`/post/edit/${id}`)}
                 style={{
                   paddingHorizontal: 12,
                   paddingVertical: 8,
@@ -198,10 +236,15 @@ const PostDetailScreen = () => {
           ) : (
             <View style={{ gap: 12 }}>
               {data.comments.map((c) => {
+                const isMyComment = user?.id === c.authorId;
                 const cAuthor = c.author?.username ?? "익명";
                 const cAvatar =
                   (c.author as any)?.avatarUrl || (c.author as any)?.avatar_url;
                 const cDate = (c as any).createdAt ?? (c as any).created_at;
+
+                const isEditing = editingCommentId === c.id;
+                const value = localBodies[c.id] ?? c.body;
+
                 return (
                   <View key={c.id} style={styles.commentRow}>
                     {cAvatar ? (
@@ -213,14 +256,115 @@ const PostDetailScreen = () => {
                         </Text>
                       </View>
                     )}
+
                     <View style={{ flex: 1 }}>
-                      <View style={styles.commentHeader}>
-                        <Text style={styles.commentAuthor}>{cAuthor}</Text>
-                        <Text style={styles.commentDate}>
-                          {formatDate(cDate)}
-                        </Text>
+                      <View
+                        style={[
+                          styles.commentHeader,
+                          { justifyContent: "space-between" },
+                        ]}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <Text style={styles.commentAuthor}>{cAuthor}</Text>
+                          <Text style={styles.commentDate}>
+                            {formatDate(cDate)}
+                          </Text>
+                        </View>
+
+                        {isMyComment && !isEditing && (
+                          <View style={{ flexDirection: "row", gap: 8 }}>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setLocalBodies((prev) => ({
+                                  ...prev,
+                                  [c.id]: c.body,
+                                }));
+                                startEdit(c.id);
+                              }}
+                              style={{
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                backgroundColor: "#eee",
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Text>수정</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => confirmDeleteComment(c.id)}
+                              style={{
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                backgroundColor: "#ffefef",
+                                borderRadius: 6,
+                              }}
+                              disabled={deletingComment}
+                            >
+                              <Text style={{ color: "#c00" }}>
+                                {deletingComment ? "삭제중..." : "삭제"}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
-                      <Text style={styles.commentBody}>{c.body}</Text>
+
+                      {!isEditing ? (
+                        <Text style={styles.commentBody}>{c.body}</Text>
+                      ) : (
+                        <View style={{ marginTop: 6, gap: 8 }}>
+                          <TextInput
+                            value={value}
+                            onChangeText={(t) =>
+                              setLocalBodies((prev) => ({ ...prev, [c.id]: t }))
+                            }
+                            style={{
+                              borderWidth: StyleSheet.hairlineWidth,
+                              borderColor: "#ccc",
+                              borderRadius: 8,
+                              paddingHorizontal: 10,
+                              paddingVertical: 8,
+                            }}
+                            multiline
+                            editable={!updatingComment}
+                          />
+                          <View style={{ flexDirection: "row", gap: 8 }}>
+                            <TouchableOpacity
+                              onPress={() => saveEdit(c.id, value)}
+                              disabled={updatingComment}
+                              style={{
+                                paddingHorizontal: 10,
+                                paddingVertical: 8,
+                                backgroundColor: "#111",
+                                borderRadius: 8,
+                              }}
+                            >
+                              <Text
+                                style={{ color: "#fff", fontWeight: "700" }}
+                              >
+                                {updatingComment ? "저장중..." : "저장"}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={cancelEdit}
+                              disabled={updatingComment}
+                              style={{
+                                paddingHorizontal: 10,
+                                paddingVertical: 8,
+                                backgroundColor: "#eee",
+                                borderRadius: 8,
+                              }}
+                            >
+                              <Text>취소</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
                     </View>
                   </View>
                 );
