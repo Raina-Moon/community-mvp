@@ -1,11 +1,18 @@
-import 'react-native-get-random-values';
+import "react-native-gesture-handler";
+import "react-native-reanimated";
+import "react-native-get-random-values";
+
 import BottomActionBar from "@/src/components/BottomActionBar";
 import { useAuthStore } from "@/src/store/auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, usePathname } from "expo-router";
 import { useEffect } from "react";
-import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { View } from 'react-native';
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const qc = new QueryClient();
 const BAR_HEIGHT = 64;
@@ -14,7 +21,9 @@ function LayoutInner() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname() ?? "";
 
-  const showBar = !(pathname.startsWith('/auth') || pathname === '/post/create');
+  const showBar = !(
+    pathname.startsWith("/auth") || pathname === "/post/create"
+  );
 
   const contentPaddingBottom = showBar
     ? BAR_HEIGHT + Math.max(insets.bottom)
@@ -41,10 +50,12 @@ export default function RootLayout() {
   }, [bootstrap, subscribeAuth]);
 
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={qc}>
-        <LayoutInner />
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <QueryClientProvider client={qc}>
+          <LayoutInner />
+        </QueryClientProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
