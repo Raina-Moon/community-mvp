@@ -1,5 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { getMyProfile, getMyPosts, getMyComments } from "../services/profile";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  getMyProfile,
+  getMyPosts,
+  getMyComments,
+  updateMyUsername,
+} from "../services/profile";
 import { useAuthStore } from "../store/auth";
 
 export function useMeProfile() {
@@ -26,5 +31,17 @@ export function useMeComments() {
     queryKey: ["me", "comments", user?.id],
     queryFn: () => getMyComments(user!.id),
     enabled: !!user?.id,
+  });
+}
+
+export function useUpdateMyUsername() {
+  const user = useAuthStore((s) => s.user);
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (newName: string) => updateMyUsername(user!.id, newName),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["me", "profile", user?.id] });
+    },
   });
 }
