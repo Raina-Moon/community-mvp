@@ -7,7 +7,6 @@ import {
   Alert,
   StyleSheet,
   Image,
-  FlatList,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +19,10 @@ import { useCreatePostMutation } from "@/src/hooks/useCreatePost";
 import { v4 as uuidv4 } from "uuid";
 import * as FileSystem from "expo-file-system";
 import { decode } from "base64-arraybuffer";
+import DraggableFlatList, {
+  ScaleDecorator,
+} from "react-native-draggable-flatlist";
+import { Pressable } from "react-native-gesture-handler";
 
 export default function CreatePostScreen() {
   const router = useRouter();
@@ -41,43 +44,43 @@ export default function CreatePostScreen() {
   }
 
   const pickImages = async () => {
-  const res = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsMultipleSelection: true,
-    quality: 0.9,
-    base64: true,              
-  });
-  if (!res.canceled) setAssets(prev => [...prev, ...res.assets]);
-};
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.9,
+      base64: true,
+    });
+    if (!res.canceled) setAssets((prev) => [...prev, ...res.assets]);
+  };
   const removeAt = (idx: number) =>
     setAssets((prev) => prev.filter((_, i) => i !== idx));
 
   const extFromMime = (mime?: string) => {
-  if (!mime) return "jpg";
-  const m = mime.split("/")[1];
-  return (m === "jpeg" ? "jpg" : m) || "jpg";
-};
+    if (!mime) return "jpg";
+    const m = mime.split("/")[1];
+    return (m === "jpeg" ? "jpg" : m) || "jpg";
+  };
 
   const toUploads = async (assets: ImagePicker.ImagePickerAsset[]) => {
-  return Promise.all(
-    assets.map(async (a) => {
-      const type = a.mimeType || "image/jpeg";
-      const ext = extFromMime(a.mimeType);
-      const name = `${uuidv4()}.${ext}`;
+    return Promise.all(
+      assets.map(async (a) => {
+        const type = a.mimeType || "image/jpeg";
+        const ext = extFromMime(a.mimeType);
+        const name = `${uuidv4()}.${ext}`;
 
-      let b64 = a.base64;
+        let b64 = a.base64;
 
-      if (!b64) {
-        b64 = await FileSystem.readAsStringAsync(a.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-      }
+        if (!b64) {
+          b64 = await FileSystem.readAsStringAsync(a.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        }
 
-      const buffer = decode(b64!);
-      return { name, type, buffer };
-    })
-  );
-};
+        const buffer = decode(b64!);
+        return { name, type, buffer };
+      })
+    );
+  };
 
   const onSubmit = async () => {
     if (submitting) return;
@@ -87,19 +90,19 @@ export default function CreatePostScreen() {
     }
     setSubmitting(true);
     try {
-    const files = assets.length ? await toUploads(assets) : undefined;
-    const p = await mutateAsync({
-      title: title.trim(),
-      content: content.trim(),
-      files,
-    });
-    router.replace({ pathname: "/post/[id]", params: { id: p.id } });
-  } catch (e: any) {
-    Alert.alert("작성 실패", e?.message ?? "다시 시도해 주세요.");
-  } finally {
-    setSubmitting(false);
-  }
-};
+      const files = assets.length ? await toUploads(assets) : undefined;
+      const p = await mutateAsync({
+        title: title.trim(),
+        content: content.trim(),
+        files,
+      });
+      router.replace({ pathname: "/post/[id]", params: { id: p.id } });
+    } catch (e: any) {
+      Alert.alert("작성 실패", e?.message ?? "다시 시도해 주세요.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -127,23 +130,46 @@ export default function CreatePostScreen() {
         />
 
         {assets.length > 0 && (
-          <FlatList
+          <DraggableFlatList
             data={assets}
             keyExtractor={(item, i) => `${item.assetId ?? item.uri}-${i}`}
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ marginBottom: 12 }}
-            renderItem={({ item, index }) => (
-              <View style={styles.thumbWrap}>
-                <Image source={{ uri: item.uri }} style={styles.thumb} />
-                <TouchableOpacity
-                  style={styles.remove}
-                  onPress={() => removeAt(index)}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "700" }}>×</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            onDragEnd={({ data }) => setAssets(data)}
+            activationDistance={10}
+            dragItemOverflow
+            contentContainerStyle={{ paddingVertical: 4, marginBottom: 12 }}
+            renderItem={({ item, drag, isActive, getIndex }) => {
+              const index = getIndex?.() ?? -1;
+              return (
+                <ScaleDecorator>
+                  <View style={{ marginRight: 8 }}>
+                    <View style={styles.thumbWrap}>
+                      <Pressable
+                        onLongPress={drag}
+                        delayLongPress={180}
+                        disabled={isActive}
+                      >
+                        <Image
+                          source={{ uri: item.uri }}
+                          style={styles.thumb}
+                        />
+                      </Pressable>
+
+                      <TouchableOpacity
+                        style={styles.remove}
+                        onPress={() => removeAt(index)}
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                      >
+                        <Text style={{ color: "#fff", fontWeight: "700" }}>
+                          ×
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </ScaleDecorator>
+              );
+            }}
           />
         )}
 
