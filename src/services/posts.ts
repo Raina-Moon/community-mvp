@@ -22,12 +22,16 @@ export async function listPostsSimple(page = 1, size = 10): Promise<Post[]> {
   const postIds = bases.map((b) => b.id);
   const { data: imgs } = await supabase
     .from("post_images")
-    .select("post_id,path,created_at")
+    .select("post_id,path,created_at,sort")
     .in("post_id", postIds);
 
   const latestPathByPost = new Map<string, string>();
   (imgs ?? [])
-    .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+    .sort(
+      (a, b) =>
+        (a.sort ?? 1e9) - (b.sort ?? 1e9) ||
+        (a.created_at ?? "").localeCompare(b.created_at ?? "")
+    )
     .forEach((row) => {
       if (!latestPathByPost.has(row.post_id))
         latestPathByPost.set(row.post_id, row.path);
@@ -72,7 +76,8 @@ export async function getPostSimple(id: string): Promise<Post> {
     .from("post_images")
     .select("path,created_at")
     .eq("post_id", id)
-    .order("created_at", { ascending: false });
+    .order("sort", { ascending: true })
+    .order("created_at", { ascending: true });
 
   const imageUrls =
     images?.map(
@@ -140,13 +145,13 @@ export async function createPost(params: {
 
   const base = toPostBase(row);
 
-   if (params.files?.length) {
+  if (params.files?.length) {
     const paths: string[] = [];
     for (const f of params.files) {
       const path = `${user.id}/${f.name}`;
       const up = await supabase.storage
-        .from("post_images")                     
-        .upload(path, f.buffer, {                 
+        .from("post_images")
+        .upload(path, f.buffer, {
           upsert: false,
           contentType: f.type || "image/jpeg",
           cacheControl: "3600",
@@ -155,9 +160,14 @@ export async function createPost(params: {
       paths.push(path);
     }
 
-    const { error: merr } = await supabase
-      .from("post_images")
-      .insert(paths.map((path) => ({ post_id: base.id, author_id: user.id, path })));
+    const { error: merr } = await supabase.from("post_images").insert(
+      paths.map((path, idx) => ({
+        post_id: base.id,
+        author_id: user.id,
+        path,
+        sort: idx,
+      }))
+    );
     if (merr) throw merr;
   }
 
@@ -168,56 +178,97 @@ export async function updatePost(params: {
   id: string;
   title?: string;
   content?: string;
-  addFiles?: UploadPart[];   
-  removePaths?: string[];   
+  addFiles?: UploadPart[];
+  removePaths?: string[];
+  reorderPaths?: string[];
 }) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('로그인이 만료되었어요. 다시 로그인 해 주세요.');
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session)
+    throw new Error("로그인이 만료되었어요. 다시 로그인 해 주세요.");
   const user = session.user;
 
   if (params.title || params.content) {
     const { error: uerr } = await supabase
-      .from('posts')
+      .from("posts")
       .update({
         ...(params.title !== undefined ? { title: params.title } : {}),
         ...(params.content !== undefined ? { content: params.content } : {}),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', params.id)
-      .eq('author_id', user.id);
+      .eq("id", params.id)
+      .eq("author_id", user.id);
     if (uerr) throw uerr;
   }
 
   if (params.removePaths?.length) {
-    const rem = await supabase.storage.from('post_images').remove(params.removePaths);
+    const rem = await supabase.storage
+      .from("post_images")
+      .remove(params.removePaths);
     if (rem.error) throw rem.error;
 
     const { error: derr } = await supabase
-      .from('post_images')
+      .from("post_images")
       .delete()
-      .in('path', params.removePaths)
-      .eq('post_id', params.id)
-      .eq('author_id', user.id);
+      .in("path", params.removePaths)
+      .eq("post_id", params.id)
+      .eq("author_id", user.id);
     if (derr) throw derr;
   }
 
+  if (params.reorderPaths?.length) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session!.user;
+
+    const updates = params.reorderPaths.map((p, idx) => ({
+      post_id: params.id,
+      path: p,
+      sort: idx,
+      author_id: user.id,
+    }));
+
+    const { error: rerr } = await supabase
+      .from("post_images")
+      .upsert(updates, { onConflict: "post_id,path" });
+    if (rerr) throw rerr;
+  }
+
   if (params.addFiles?.length) {
-    const paths: string[] = [];
-    for (const f of params.addFiles) {
+    const { data: remained } = await supabase
+      .from("post_images")
+      .select("path")
+      .eq("post_id", params.id)
+      .order("sort", { ascending: true });
+    const start = remained?.length ?? 0;
+
+    const rows: {
+      post_id: string;
+      author_id: string;
+      path: string;
+      sort: number;
+    }[] = [];
+    for (const [i, f] of params.addFiles.entries()) {
       const path = `${user.id}/${f.name}`;
       const up = await supabase.storage
-        .from('post_images')
+        .from("post_images")
         .upload(path, f.buffer, {
-          contentType: f.type || 'image/jpeg',
+          contentType: f.type || "image/jpeg",
           upsert: false,
-          cacheControl: '3600',
+          cacheControl: "3600",
         });
       if (up.error) throw up.error;
-      paths.push(path);
+      rows.push({
+        post_id: params.id,
+        author_id: user.id,
+        path,
+        sort: start + i,
+      });
     }
 
-    const rows = paths.map((p) => ({ post_id: params.id, author_id: user.id, path: p }));
-    const { error: ierr } = await supabase.from('post_images').insert(rows);
+    const { error: ierr } = await supabase.from("post_images").insert(rows);
     if (ierr) throw ierr;
   }
 
@@ -225,32 +276,34 @@ export async function updatePost(params: {
 }
 
 export async function deletePost(id: string) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('로그인이 만료되었어요. 다시 로그인 해 주세요.');
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session)
+    throw new Error("로그인이 만료되었어요. 다시 로그인 해 주세요.");
   const user = session.user;
 
   const { data: imgs, error: ierr } = await supabase
-    .from('post_images')
-    .select('path')
-    .eq('post_id', id);
+    .from("post_images")
+    .select("path")
+    .eq("post_id", id);
   if (ierr) throw ierr;
 
   const paths = (imgs ?? []).map((r) => r.path);
   if (paths.length) {
-    const rem = await supabase.storage.from('post_images').remove(paths);
+    const rem = await supabase.storage.from("post_images").remove(paths);
     if (rem.error) throw rem.error;
   }
 
   const { error: perr } = await supabase
-    .from('posts')
+    .from("posts")
     .delete()
-    .eq('id', id)
-    .eq('author_id', user.id);
+    .eq("id", id)
+    .eq("author_id", user.id);
   if (perr) throw perr;
 
   return true;
 }
-
 
 export async function createComment(postId: string, body: string) {
   const {
