@@ -40,11 +40,15 @@ const PostDetailScreen = () => {
   const id = Array.isArray(params.id) ? params.id[0] : params.id ?? "";
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
+
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [localBodies, setLocalBodies] = useState<Record<string, string>>({});
+  const [editingText, setEditingText] = useState("");
+
+  const [commentText, setCommentText] = useState("");
 
   const { data, isLoading } = usePostQuery(id);
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const isMine = user?.id && data?.authorId === user.id;
 
@@ -52,18 +56,13 @@ const PostDetailScreen = () => {
     useUpdateCommentMutation(id);
   const { mutateAsync: deleteCommentMut, isPending: deletingComment } =
     useDeleteCommentMutation(id);
-
   const { mutateAsync: removePost, isPending: removing } =
     useDeletePostMutation(id);
+  const { mutateAsync: addComment, isPending: adding } =
+    useCreateCommentMutation(id);
 
   const images = useMemo(() => data?.imageUrls ?? [], [data?.imageUrls]);
   const [index, setIndex] = useState(0);
-  const [commentText, setCommentText] = useState("");
-
-  const insets = useSafeAreaInsets();
-
-  const { mutateAsync: addComment, isPending: adding } =
-    useCreateCommentMutation(id);
 
   if (!user) {
     return (
@@ -73,12 +72,8 @@ const PostDetailScreen = () => {
       />
     );
   }
-
   if (isLoading) return <ActivityIndicator style={{ marginTop: 40 }} />;
-
-  if (!data) {
-    return <Text>존재하지 않는 글입니다.</Text>;
-  }
+  if (!data) return <Text>존재하지 않는 글입니다.</Text>;
 
   const createdAt = (data as any).createdAt ?? (data as any).created_at;
   const authorName = data.author?.username ?? "Unknown";
@@ -118,15 +113,24 @@ const PostDetailScreen = () => {
     ]);
   };
 
-  const startEdit = (commentId: string) => setEditingCommentId(commentId);
-  const cancelEdit = () => setEditingCommentId(null);
+  const startEdit = (commentId: string, initial: string) => {
+    setEditingCommentId(commentId);
+    setEditingText(initial);
+  };
 
-  const saveEdit = async (commentId: string, body: string) => {
-    const next = body.trim();
+  const cancelEdit = () => {
+    setEditingCommentId(null);
+    setEditingText("");
+  };
+
+  const saveEdit = async () => {
+    const commentId = editingCommentId!;
+    const next = editingText.trim();
     if (!next) return Alert.alert("알림", "내용을 입력하세요");
     try {
       await updateCommentMut({ commentId, body: next });
       setEditingCommentId(null);
+      setEditingText("");
     } catch (e: any) {
       Alert.alert("수정 실패", e?.message ?? "다시 시도해 주세요.");
     }
@@ -152,12 +156,12 @@ const PostDetailScreen = () => {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? insets.bottom : 0}
     >
       <View style={{ flex: 1 }}>
         <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 16 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 16 + 70 }}
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.title}>{data.title}</Text>
@@ -166,24 +170,14 @@ const PostDetailScreen = () => {
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
               <TouchableOpacity
                 onPress={() => router.push(`/post/edit/${id}`)}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  backgroundColor: "#eee",
-                  borderRadius: 8,
-                }}
+                style={btn.grayLg}
               >
                 <Text>수정</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={confirmDelete}
                 disabled={removing}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  backgroundColor: "#ffefef",
-                  borderRadius: 8,
-                }}
+                style={btn.redLg}
               >
                 <Text style={{ color: "#c00" }}>
                   {removing ? "삭제중..." : "삭제"}
@@ -224,7 +218,6 @@ const PostDetailScreen = () => {
 
           <Text style={styles.content}>{data.content}</Text>
 
-          {/* 구분선 */}
           <View style={styles.hr} />
 
           <Text style={styles.sectionTitle}>
@@ -241,9 +234,7 @@ const PostDetailScreen = () => {
                 const cAvatar =
                   (c.author as any)?.avatarUrl || (c.author as any)?.avatar_url;
                 const cDate = (c as any).createdAt ?? (c as any).created_at;
-
                 const isEditing = editingCommentId === c.id;
-                const value = localBodies[c.id] ?? c.body;
 
                 return (
                   <View key={c.id} style={styles.commentRow}>
@@ -280,30 +271,14 @@ const PostDetailScreen = () => {
                         {isMyComment && !isEditing && (
                           <View style={{ flexDirection: "row", gap: 8 }}>
                             <TouchableOpacity
-                              onPress={() => {
-                                setLocalBodies((prev) => ({
-                                  ...prev,
-                                  [c.id]: c.body,
-                                }));
-                                startEdit(c.id);
-                              }}
-                              style={{
-                                paddingHorizontal: 8,
-                                paddingVertical: 4,
-                                backgroundColor: "#eee",
-                                borderRadius: 6,
-                              }}
+                              onPress={() => startEdit(c.id, c.body)}
+                              style={btn.gray}
                             >
                               <Text>수정</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                               onPress={() => confirmDeleteComment(c.id)}
-                              style={{
-                                paddingHorizontal: 8,
-                                paddingVertical: 4,
-                                backgroundColor: "#ffefef",
-                                borderRadius: 6,
-                              }}
+                              style={btn.red}
                               disabled={deletingComment}
                             >
                               <Text style={{ color: "#c00" }}>
@@ -312,59 +287,22 @@ const PostDetailScreen = () => {
                             </TouchableOpacity>
                           </View>
                         )}
+
+                        {isEditing && (
+                          <View
+                            style={{
+                              paddingHorizontal: 8,
+                              paddingVertical: 2,
+                              backgroundColor: "#eef",
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text style={{ color: "#335" }}>수정 중…</Text>
+                          </View>
+                        )}
                       </View>
 
-                      {!isEditing ? (
-                        <Text style={styles.commentBody}>{c.body}</Text>
-                      ) : (
-                        <View style={{ marginTop: 6, gap: 8 }}>
-                          <TextInput
-                            value={value}
-                            onChangeText={(t) =>
-                              setLocalBodies((prev) => ({ ...prev, [c.id]: t }))
-                            }
-                            style={{
-                              borderWidth: StyleSheet.hairlineWidth,
-                              borderColor: "#ccc",
-                              borderRadius: 8,
-                              paddingHorizontal: 10,
-                              paddingVertical: 8,
-                            }}
-                            multiline
-                            editable={!updatingComment}
-                          />
-                          <View style={{ flexDirection: "row", gap: 8 }}>
-                            <TouchableOpacity
-                              onPress={() => saveEdit(c.id, value)}
-                              disabled={updatingComment}
-                              style={{
-                                paddingHorizontal: 10,
-                                paddingVertical: 8,
-                                backgroundColor: "#111",
-                                borderRadius: 8,
-                              }}
-                            >
-                              <Text
-                                style={{ color: "#fff", fontWeight: "700" }}
-                              >
-                                {updatingComment ? "저장중..." : "저장"}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={cancelEdit}
-                              disabled={updatingComment}
-                              style={{
-                                paddingHorizontal: 10,
-                                paddingVertical: 8,
-                                backgroundColor: "#eee",
-                                borderRadius: 8,
-                              }}
-                            >
-                              <Text>취소</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      )}
+                      <Text style={styles.commentBody}>{c.body}</Text>
                     </View>
                   </View>
                 );
@@ -373,37 +311,105 @@ const PostDetailScreen = () => {
           )}
         </ScrollView>
 
-        <View
-          style={[
-            styles.inputBar,
-            { paddingBottom: Math.max(insets.bottom, 12) },
-          ]}
-        >
-          <TextInput
-            style={styles.input}
-            placeholder="댓글을 입력하세요"
-            value={commentText}
-            onChangeText={setCommentText}
-            editable={!adding}
-            returnKeyType="send"
-            onSubmitEditing={submitComment}
-          />
-          <TouchableOpacity
+        {!editingCommentId && (
+          <View
             style={[
-              styles.sendBtn,
-              (!commentText.trim() || adding) && { opacity: 0.5 },
+              styles.inputBar,
+              { paddingBottom: Math.max(insets.bottom, 12) },
             ]}
-            onPress={submitComment}
-            disabled={!commentText.trim() || adding}
           >
-            <Text style={styles.sendBtnText}>
-              {adding ? "등록중..." : "등록"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <TextInput
+              style={styles.input}
+              placeholder="댓글을 입력하세요"
+              value={commentText}
+              onChangeText={setCommentText}
+              editable={!adding}
+              returnKeyType="send"
+              onSubmitEditing={submitComment}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendBtn,
+                (!commentText.trim() || adding) && { opacity: 0.5 },
+              ]}
+              onPress={submitComment}
+              disabled={!commentText.trim() || adding}
+            >
+              <Text style={styles.sendBtnText}>
+                {adding ? "등록중..." : "등록"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {editingCommentId && (
+          <View
+            style={[
+              styles.editBar,
+              { paddingBottom: Math.max(insets.bottom, 12) },
+            ]}
+          >
+            <TextInput
+              style={styles.input}
+              placeholder="댓글을 수정하세요"
+              value={editingText}
+              onChangeText={setEditingText}
+              editable={!updatingComment}
+              returnKeyType="send"
+              onSubmitEditing={saveEdit}
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendBtn,
+                (!editingText.trim() || updatingComment) && { opacity: 0.5 },
+              ]}
+              onPress={saveEdit}
+              disabled={!editingText.trim() || updatingComment}
+            >
+              <Text style={styles.sendBtnText}>
+                {updatingComment ? "저장중..." : "저장"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={cancelEdit}
+              disabled={updatingComment}
+            >
+              <Text style={{ fontWeight: "700" }}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
+};
+
+const btn = {
+  gray: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#eee",
+    borderRadius: 6,
+  } as const,
+  red: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#ffefef",
+    borderRadius: 6,
+  } as const,
+  grayLg: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#eee",
+    borderRadius: 8,
+  } as const,
+  redLg: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#ffefef",
+    borderRadius: 8,
+  } as const,
 };
 
 const styles = StyleSheet.create({
@@ -436,6 +442,20 @@ const styles = StyleSheet.create({
   commentAuthor: { fontWeight: "700" },
   commentDate: { color: "#888", fontSize: 12 },
   commentBody: { marginTop: 4, lineHeight: 20 },
+
+  barBase: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    gap: 8,
+    padding: 12,
+    backgroundColor: "#fff",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#eee",
+  },
+
   inputBar: {
     position: "absolute",
     left: 0,
@@ -448,6 +468,20 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: "#eee",
   },
+
+  editBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    gap: 8,
+    padding: 12,
+    backgroundColor: "#fff",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#eee",
+  },
+
   input: {
     flex: 1,
     borderWidth: StyleSheet.hairlineWidth,
@@ -464,6 +498,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sendBtnText: { color: "#fff", fontWeight: "700" },
+  cancelBtn: {
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#eee",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
 
 export default PostDetailScreen;
