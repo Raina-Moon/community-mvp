@@ -1,15 +1,17 @@
+import { usePostsQuery } from "@/src/features/post/hooks/usePosts";
+import { useAuthStore } from "@/src/store/auth";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
   ActivityIndicator,
   FlatList,
+  SafeAreaView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import PostCard from "../src/components/PostCard";
-import { usePostsQuery } from "@/src/hooks/usePosts";
-import { useRouter } from "expo-router";
-import { useAuthStore } from "@/src/store/auth";
 
 const Home = () => {
   const router = useRouter();
@@ -19,24 +21,49 @@ const Home = () => {
   if (isLoading) return <ActivityIndicator style={{ marginTop: 40 }} />;
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
-      <Text style={{ flex: 1 }}>Home Screen</Text>
-      {user ? (
-        <TouchableOpacity onPress={() => router.push("/profile/me")}>
-          <Text>Profile</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity onPress={() => router.push("/auth/sign-in")}>
-          <Text>Login</Text>
-        </TouchableOpacity>
-      )}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Home Screen</Text>
+        {user ? (
+          <TouchableOpacity onPress={() => router.push("/profile/me")}>
+            <Text style={styles.link}>Profile</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => router.push("/auth/sign-in")}>
+            <Text style={styles.link}>Login</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       <FlatList
         data={data}
         keyExtractor={(p) => p.id}
         renderItem={({ item }) => <PostCard post={item} />}
       />
-    </View>
+    </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  header: {
+    flexDirection: "row",
+    paddingHorizontal: 14,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  link: {
+    fontSize: 16,
+    color: "blue",
+  },
+});
 
 export default Home;

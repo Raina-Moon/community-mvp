@@ -1,7 +1,7 @@
-import { supabase } from "../lib/supabase";
-import { Post } from "../types/post";
-import { toPostBase, toUser, toComment } from "../lib/mappers";
-import type { Comment as CommentType } from "../types/comment";
+import { toComment, toPostBase, toUser } from "../../../lib/mappers";
+import { supabase } from "../../../lib/supabase";
+import type { Comment as CommentType } from "../../../types/comment";
+import { Post } from "../../../types/post";
 
 type UploadPart = { name: string; type: string; buffer: ArrayBuffer };
 

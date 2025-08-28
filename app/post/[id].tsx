@@ -1,28 +1,28 @@
-import React, { useMemo, useState } from "react";
 import LoginRequired from "@/src/components/LoginRequired";
-import { usePostQuery } from "@/src/hooks/usePosts";
+import { useDeletePostMutation } from "@/src/features/post/hooks/useDeletePost";
+import { usePostQuery } from "@/src/features/post/hooks/usePosts";
+import { useCreateCommentMutation } from "@/src/hooks/useCreateComment";
 import { useAuthStore } from "@/src/store/auth";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
-  ScrollView,
-  Text,
-  useWindowDimensions,
-  View,
-  StyleSheet,
+  KeyboardAvoidingView,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Alert,
-  KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
-import { useCreateCommentMutation } from "@/src/hooks/useCreateComment";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useDeletePostMutation } from "@/src/hooks/useDeletePost";
 
 function formatDate(iso?: string) {
   if (!iso) return "";
