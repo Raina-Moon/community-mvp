@@ -1,17 +1,17 @@
+import { usePostsQuery } from "@/src/features/post/hooks/usePosts";
+import { useAuthStore } from "@/src/store/auth";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
   ActivityIndicator,
   FlatList,
+  SafeAreaView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  SafeAreaView,
-  StyleSheet,
 } from "react-native";
 import PostCard from "../src/components/PostCard";
-import { usePostsQuery } from "@/src/hooks/usePosts";
-import { useRouter } from "expo-router";
-import { useAuthStore } from "@/src/store/auth";
 
 const Home = () => {
   const router = useRouter();

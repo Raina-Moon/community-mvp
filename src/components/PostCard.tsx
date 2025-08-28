@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { Post } from "../types/post";
 import { useAuthStore } from "../store/auth";
+import { formatDate } from "../utils/date";
 
 type Props = {
   post: Post;
@@ -10,14 +11,6 @@ type Props = {
   showAuthor?: boolean;
   showExcerpt?: boolean;
   showThumbnail?: boolean;
-};
-
-const formatDate = (iso: string) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}.${mm}.${dd}`;
 };
 
 function PostCard({

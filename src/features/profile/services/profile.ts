@@ -1,6 +1,6 @@
-import { supabase } from "../lib/supabase";
-import { Post } from "../types/post";
-import { Comment } from "../types/comment";
+import { supabase } from "../../../lib/supabase";
+import { Comment } from "../../../types/comment";
+import { Post } from "../../../types/post";
 
 type ProfileRow = {
   id: string;

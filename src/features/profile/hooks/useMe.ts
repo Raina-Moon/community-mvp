@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuthStore } from "../../../store/auth";
 import {
-  getMyProfile,
-  getMyPosts,
-  getMyComments,
-  updateMyUsername,
+    getMyComments,
+    getMyPosts,
+    getMyProfile,
+    updateMyUsername,
 } from "../services/profile";
-import { useAuthStore } from "../store/auth";
 
 export function useMeProfile() {
   const user = useAuthStore((s) => s.user);
