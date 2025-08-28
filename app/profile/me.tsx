@@ -54,9 +54,6 @@ const MeScreen = () => {
           <Text style={styles.username}>
             {profile?.username ?? "(no username)"}
           </Text>
-          {!!profile?.email && (
-            <Text style={styles.email}>{profile.email}</Text>
-          )}
           <Text style={styles.createdAt}>
             Joined: {formatDate(profile?.createdAt)}
           </Text>
