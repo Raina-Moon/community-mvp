@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -6,9 +6,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
   Alert,
-  TextInput,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "@/src/store/auth";
@@ -17,22 +15,17 @@ import {
   useMePosts,
   useMeComments,
   useUpdateMyUsername,
-} from "@/src/hooks/useMe";
+} from "@/src/features/profile/hooks/useMe";
 import { Post } from "@/src/types/post";
 import { Comment } from "@/src/types/comment";
-
-const formatDate = (iso?: string) => {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleDateString();
-  } catch {
-    return iso;
-  }
-};
+import { formatDate } from "@/src/utils/date";
+import ProfileHeader from "@/src/features/profile/components/ProfileHeader";
 
 const MeScreen = () => {
   const router = useRouter();
-  const { user, signOut } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const signOut = useAuthStore((s) => s.signOut);
+
   const [tab, setTab] = useState<"posts" | "comments">("posts");
 
   const { data: profile, isLoading: loadingProfile } = useMeProfile();
@@ -45,9 +38,7 @@ const MeScreen = () => {
   const [usernameInput, setUsernameInput] = useState("");
 
   useEffect(() => {
-    if (profile && !editing) {
-      setUsernameInput(profile.username ?? "");
-    }
+    if (profile && !editing) setUsernameInput(profile.username ?? "");
   }, [profile, editing]);
 
   const loading =
@@ -66,9 +57,8 @@ const MeScreen = () => {
   const handleSaveName = useCallback(async () => {
     const next = usernameInput.trim();
     if (!next) return Alert.alert("알림", "닉네임을 입력하세요");
-    if (next.length < 2 || next.length > 20) {
+    if (next.length < 2 || next.length > 20)
       return Alert.alert("알림", "닉네임은 2~20자로 입력하세요");
-    }
     try {
       await saveUsername(next);
       setEditing(false);
@@ -77,110 +67,6 @@ const MeScreen = () => {
       Alert.alert("에러", e.message ?? "닉네임 변경 실패");
     }
   }, [usernameInput, saveUsername]);
-
-  const header = useMemo(
-    () => (
-      <View style={styles.headerBox}>
-        <Text style={styles.heading}>My Profile</Text>
-
-        <View style={styles.profileBox}>
-          {!editing ? (
-            <View style={styles.row}>
-              <Text style={styles.username}>
-                {profile?.username ?? "(no username)"}
-              </Text>
-              <TouchableOpacity
-                style={styles.editBtn}
-                onPress={() => setEditing(true)}
-              >
-                <Text style={styles.editText}>수정</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.editRow}>
-              <TextInput
-                value={usernameInput}
-                onChangeText={setUsernameInput}
-                placeholder="닉네임 (2~20자)"
-                maxLength={20}
-                autoCapitalize="none"
-                style={styles.input}
-                editable={!savingName}
-              />
-              <TouchableOpacity
-                style={[styles.saveBtn, savingName && { opacity: 0.6 }]}
-                onPress={handleSaveName}
-                disabled={savingName}
-              >
-                <Text style={styles.saveText}>
-                  {savingName ? "저장중..." : "저장"}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => {
-                  setEditing(false);
-                  setUsernameInput(profile?.username ?? "");
-                }}
-                disabled={savingName}
-              >
-                <Text style={styles.cancelText}>취소</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <Text style={styles.createdAt}>
-            Joined: {formatDate(profile?.createdAt)}
-          </Text>
-        </View>
-
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
-          <Text style={styles.logoutText}>로그아웃</Text>
-        </TouchableOpacity>
-
-        <View style={styles.tabs}>
-          <TouchableOpacity
-            onPress={() => setTab("posts")}
-            style={[styles.tabBtn, tab === "posts" && styles.tabActive]}
-          >
-            <Text
-              style={[styles.tabText, tab === "posts" && styles.tabTextActive]}
-            >
-              내 글
-              {typeof posts?.length === "number" ? ` (${posts.length})` : ""}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setTab("comments")}
-            style={[styles.tabBtn, tab === "comments" && styles.tabActive]}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                tab === "comments" && styles.tabTextActive,
-              ]}
-            >
-              내 댓글
-              {typeof comments?.length === "number"
-                ? ` (${comments.length})`
-                : ""}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    ),
-    [
-      profile,
-      tab,
-      posts?.length,
-      comments?.length,
-      handleSignOut,
-      editing,
-      usernameInput,
-      savingName,
-      handleSaveName,
-    ]
-  );
 
   if (!user) {
     return (
@@ -192,13 +78,34 @@ const MeScreen = () => {
     );
   }
 
+  const headerEl = (
+    <ProfileHeader
+      profile={profile}
+      editing={editing}
+      usernameInput={usernameInput}
+      onChangeUsername={setUsernameInput}
+      onStartEdit={() => setEditing(true)}
+      onCancelEdit={() => {
+        setEditing(false);
+        setUsernameInput(profile?.username ?? "");
+      }}
+      onSaveName={handleSaveName}
+      savingName={savingName}
+      onSignOut={handleSignOut}
+      tab={tab}
+      setTab={setTab}
+      postsLen={posts?.length}
+      commentsLen={comments?.length}
+    />
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {loading && <ActivityIndicator style={{ marginTop: 20 }} />}
 
       {tab === "posts" ? (
         <FlatList<Post>
-          ListHeaderComponent={header}
+          ListHeaderComponent={headerEl}
           data={posts ?? []}
           keyExtractor={(p) => p.id}
           renderItem={({ item }) => (
@@ -226,7 +133,7 @@ const MeScreen = () => {
         />
       ) : (
         <FlatList<Comment>
-          ListHeaderComponent={header}
+          ListHeaderComponent={headerEl}
           data={comments ?? []}
           keyExtractor={(c) => c.id}
           renderItem={({ item }) => (
@@ -242,7 +149,7 @@ const MeScreen = () => {
           )}
           ListEmptyComponent={
             !loading ? (
-              <Text style={styles.empty}>작성한 댓글이 없습니다.</Text>
+              <Text style={styles.empty}>작성한 댓글이 없습니다。</Text>
             ) : null
           }
           contentContainerStyle={styles.listContent}
@@ -256,65 +163,6 @@ export default MeScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
-  headerBox: { paddingTop: 8, paddingBottom: 12 },
-  heading: { fontSize: 20, fontWeight: "700", marginTop: 8, marginBottom: 6 },
-  profileBox: { gap: 6, marginBottom: 12 },
-  row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  editRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  username: { fontSize: 18, fontWeight: "600" },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 16,
-    backgroundColor: "#fff",
-  },
-  editBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  editText: { color: "#333" },
-  saveBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#2a7",
-  },
-  saveText: { color: "#fff", fontWeight: "700" },
-  cancelBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#eee",
-  },
-  cancelText: { color: "#333", fontWeight: "600" },
-  createdAt: { color: "#666", fontSize: 12 },
-  logoutBtn: {
-    marginTop: 8,
-    alignSelf: "flex-start",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#f55",
-  },
-  logoutText: { color: "#fff", fontWeight: "600" },
-  tabs: { flexDirection: "row", gap: 8, marginTop: 12 },
-  tabBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  tabActive: { backgroundColor: "#eef5ff", borderColor: "#aac8ff" },
-  tabText: { fontSize: 14, color: "#333" },
-  tabTextActive: { fontWeight: "700" },
   listContent: { paddingBottom: 24 },
   itemBox: {
     paddingVertical: 10,
