@@ -25,7 +25,7 @@ function LayoutInner() {
   const pathname = usePathname() ?? "";
 
   const showBar = !(
-    pathname.startsWith("/auth") || pathname === "/post/create"
+    pathname.startsWith("/auth") || pathname === "/post/create" || pathname.startsWith("/post/edit")
   );
 
       const contentPaddingBottom = showBar
