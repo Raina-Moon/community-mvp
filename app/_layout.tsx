@@ -2,7 +2,10 @@ import "react-native-gesture-handler";
 import "react-native-reanimated";
 import "react-native-get-random-values";
 
-import BottomActionBar from "@/src/components/BottomActionBar";
+import BottomActionBar, {
+  GLOBAL_BAR_HEIGHT,
+  GLOBAL_BAR_MIN_BOTTOM,
+} from "@/src/components/BottomActionBar";
 import { useAuthStore } from "@/src/store/auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, usePathname } from "expo-router";
@@ -15,7 +18,6 @@ import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const qc = new QueryClient();
-const BAR_HEIGHT = 30;
 const BG = "#F7FAFC";
 
 function LayoutInner() {
@@ -26,8 +28,8 @@ function LayoutInner() {
     pathname.startsWith("/auth") || pathname === "/post/create"
   );
 
-  const contentPaddingBottom = showBar
-    ? BAR_HEIGHT + Math.max(insets.bottom)
+      const contentPaddingBottom = showBar
+    ? GLOBAL_BAR_HEIGHT + Math.max(insets.bottom, GLOBAL_BAR_MIN_BOTTOM)
     : Math.max(insets.bottom, 0);
 
   return (
