@@ -16,6 +16,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const qc = new QueryClient();
 const BAR_HEIGHT = 64;
+const BG = "#F7FAFC";
 
 function LayoutInner() {
   const insets = useSafeAreaInsets();
@@ -31,7 +32,7 @@ function LayoutInner() {
 
   return (
     <>
-      <View style={{ flex: 1, paddingBottom: contentPaddingBottom }}>
+      <View style={{ flex: 1, paddingBottom: contentPaddingBottom , backgroundColor: BG }}>
         <Stack screenOptions={{ headerShown: false }} />
       </View>
       <BottomActionBar />
@@ -50,8 +51,8 @@ export default function RootLayout() {
   }, [bootstrap, subscribeAuth]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: BG }}>
+      <SafeAreaProvider style={{ flex: 1, backgroundColor: BG }}>
         <QueryClientProvider client={qc}>
           <LayoutInner />
         </QueryClientProvider>
