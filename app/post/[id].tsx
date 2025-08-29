@@ -16,7 +16,6 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -24,7 +23,12 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 
 function formatDate(iso?: string) {
   if (!iso) return "";
@@ -35,6 +39,17 @@ function formatDate(iso?: string) {
   )}:${pad(d.getMinutes())}`;
 }
 
+const COLORS = {
+  bg: "#F7FAFC",
+  card: "#FFFFFF",
+  text: "#111827",
+  sub: "#6B7280",
+  line: "#E5E7EB",
+  tint: "#111827",
+  chipBg: "#F3F4F6",
+  danger: "#DC2626",
+};
+
 const PostDetailScreen = () => {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id ?? "";
@@ -43,14 +58,15 @@ const PostDetailScreen = () => {
 
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
-
   const [commentText, setCommentText] = useState("");
+
+  const insets = useSafeAreaInsets();
+  const isIOS = Platform.OS === "ios";
 
   const { data, isLoading } = usePostQuery(id);
   const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
 
-  const isMine = user?.id && data?.authorId === user.id;
+  const isMine = !!(user?.id && data?.authorId === user.id);
 
   const { mutateAsync: updateCommentMut, isPending: updatingComment } =
     useUpdateCommentMutation(id);
@@ -77,6 +93,8 @@ const PostDetailScreen = () => {
 
   const createdAt = (data as any).createdAt ?? (data as any).created_at;
   const authorName = data.author?.username ?? "Unknown";
+  const authorAvatar =
+    (data.author as any)?.avatarUrl || (data.author as any)?.avatar_url;
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;
@@ -86,7 +104,7 @@ const PostDetailScreen = () => {
 
   const submitComment = async () => {
     const body = commentText.trim();
-    if (!body) return;
+    if (!body || adding) return;
     try {
       await addComment(body);
       setCommentText("");
@@ -95,7 +113,7 @@ const PostDetailScreen = () => {
     }
   };
 
-  const confirmDelete = () => {
+  const confirmDeletePost = () => {
     Alert.alert("삭제할까요?", "삭제하면 되돌릴 수 없습니다.", [
       { text: "취소", style: "cancel" },
       {
@@ -154,164 +172,196 @@ const PostDetailScreen = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? insets.bottom : 0}
-    >
-      <View style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 16 + 70 }}
-          keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.root} edges={["top"]}>
+      <StatusBar style="dark" backgroundColor="#fff" translucent={false} />
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.headerIconBtn}
         >
-          <Text style={styles.title}>{data.title}</Text>
-
-          {isMine && (
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
-              <TouchableOpacity
-                onPress={() => router.push(`/post/edit/${id}`)}
-                style={btn.grayLg}
-              >
-                <Text>수정</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={confirmDelete}
-                disabled={removing}
-                style={btn.redLg}
-              >
-                <Text style={{ color: "#c00" }}>
-                  {removing ? "삭제중..." : "삭제"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <Text style={styles.meta}>
-            {authorName} · {formatDate(createdAt)}
-          </Text>
-
-          {images.length > 0 && (
-            <View style={[styles.carouselWrap, { width }]}>
-              <FlatList
-                data={images}
-                keyExtractor={(uri, i) => `${uri}-${i}`}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onScroll={onScroll}
-                scrollEventThrottle={16}
-                renderItem={({ item: uri }) => (
-                  <Image
-                    source={{ uri }}
-                    style={[styles.image, { width }]}
-                    resizeMode="cover"
-                  />
-                )}
+          <Ionicons name="chevron-back" size={20} color={COLORS.text} />
+        </TouchableOpacity>
+        <Text numberOfLines={1} style={styles.headerTitle}>
+          게시글
+        </Text>
+        {isMine ? (
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => router.push(`/post/edit/${id}`)}
+              style={styles.headerIconBtn}
+              disabled={removing}
+            >
+              <Ionicons name="create-outline" size={18} color={COLORS.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={confirmDeletePost}
+              style={styles.headerIconBtn}
+              disabled={removing}
+            >
+              <Ionicons
+                name="trash-outline"
+                size={18}
+                color={removing ? "#bbb" : "#DC2626"}
               />
-              <View style={styles.pageBadge}>
-                <Text style={styles.pageBadgeText}>
-                  {index + 1} / {images.length}
-                </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.headerIconBtn} />
+        )}
+      </View>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: COLORS.bg }}
+        behavior={isIOS ? "padding" : "height"}
+        keyboardVerticalOffset={insets.bottom}
+      >
+        <FlatList
+          contentContainerStyle={{
+            paddingBottom: (editingCommentId ? 92 : 76) + insets.bottom,
+          }}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <View style={styles.contentWrap}>
+              <Text style={styles.title}>{data.title}</Text>
+
+              <View style={styles.metaRow}>
+                {authorAvatar ? (
+                  <Image
+                    source={{ uri: authorAvatar }}
+                    style={styles.authorAvatar}
+                  />
+                ) : (
+                  <View style={[styles.authorAvatar, styles.avatarFallback]}>
+                    <Text style={{ color: "#fff", fontSize: 12 }}>
+                      {authorName.slice(0, 1)}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.metaChip}>
+                  <Ionicons name="person-outline" size={14} color="#9AA0A6" />
+                  <Text style={styles.metaText}>{authorName}</Text>
+                </View>
+                <View style={styles.metaChip}>
+                  <Ionicons name="time-outline" size={14} color="#9AA0A6" />
+                  <Text style={styles.metaText}>{formatDate(createdAt)}</Text>
+                </View>
               </View>
+
+              {images.length > 0 && (
+                <View style={styles.carouselCard}>
+                  <FlatList
+                    data={images}
+                    keyExtractor={(uri, i) => `${uri}-${i}`}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={onScroll}
+                    scrollEventThrottle={16}
+                    renderItem={({ item: uri }) => (
+                      <Image
+                        source={{ uri }}
+                        style={[styles.image, { width: width - 32 }]}
+                        resizeMode="cover"
+                      />
+                    )}
+                  />
+                  <View style={styles.dotsRow}>
+                    {images.map((_, i) => (
+                      <View
+                        key={i}
+                        style={[styles.dot, i === index && styles.dotActive]}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {!!data.content && (
+                <Text style={styles.bodyText}>{data.content}</Text>
+              )}
+
+              <View style={styles.sectionDivider} />
+
+              <Text style={styles.sectionTitle}>
+                댓글 {data.comments?.length ?? 0}
+              </Text>
             </View>
-          )}
+          }
+          data={data.comments ?? []}
+          keyExtractor={(c) => c.id}
+          renderItem={({ item: c }) => {
+            const isMyComment = user?.id === c.authorId;
+            const cAuthor = c.author?.username ?? "익명";
+            const cDate = (c as any).createdAt ?? (c as any).created_at;
+            const isEditing = editingCommentId === c.id;
 
-          <Text style={styles.content}>{data.content}</Text>
+            return (
+              <View style={styles.commentItem}>
+                <View style={[styles.commentAvatar, styles.avatarFallback]}>
+                  <Text style={{ color: "#fff", fontSize: 12 }}>
+                    {cAuthor.slice(0, 1)}
+                  </Text>
+                </View>
 
-          <View style={styles.hr} />
+                <View style={styles.bubble}>
+                  <View style={styles.commentTopRow}>
+                    <Text style={styles.commentAuthor}>{cAuthor}</Text>
+                    <Text style={styles.commentDate}>{formatDate(cDate)}</Text>
 
-          <Text style={styles.sectionTitle}>
-            댓글 {data.comments?.length ?? 0}
-          </Text>
-
-          {!data.comments || data.comments.length === 0 ? (
-            <Text style={styles.empty}>아직 댓글이 없어요.</Text>
-          ) : (
-            <View style={{ gap: 12 }}>
-              {data.comments.map((c) => {
-                const isMyComment = user?.id === c.authorId;
-                const cAuthor = c.author?.username ?? "익명";
-                const cAvatar =
-                  (c.author as any)?.avatarUrl || (c.author as any)?.avatar_url;
-                const cDate = (c as any).createdAt ?? (c as any).created_at;
-                const isEditing = editingCommentId === c.id;
-
-                return (
-                  <View key={c.id} style={styles.commentRow}>
-                    {cAvatar ? (
-                      <Image source={{ uri: cAvatar }} style={styles.avatar} />
-                    ) : (
-                      <View style={[styles.avatar, styles.avatarFallback]}>
-                        <Text style={{ color: "#fff", fontSize: 12 }}>
-                          {cAuthor.slice(0, 1)}
-                        </Text>
+                    {!isEditing && isMyComment && (
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity
+                          onPress={() => startEdit(c.id, c.body)}
+                        >
+                          <Text style={styles.actionText}>수정</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => confirmDeleteComment(c.id)}
+                          disabled={deletingComment}
+                        >
+                          <Text
+                            style={[
+                              styles.actionText,
+                              { color: COLORS.danger },
+                            ]}
+                          >
+                            {deletingComment ? "삭제중…" : "삭제"}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     )}
 
-                    <View style={{ flex: 1 }}>
-                      <View
-                        style={[
-                          styles.commentHeader,
-                          { justifyContent: "space-between" },
-                        ]}
-                      >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
-                        >
-                          <Text style={styles.commentAuthor}>{cAuthor}</Text>
-                          <Text style={styles.commentDate}>
-                            {formatDate(cDate)}
-                          </Text>
-                        </View>
-
-                        {isMyComment && !isEditing && (
-                          <View style={{ flexDirection: "row", gap: 8 }}>
-                            <TouchableOpacity
-                              onPress={() => startEdit(c.id, c.body)}
-                              style={btn.gray}
-                            >
-                              <Text>수정</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => confirmDeleteComment(c.id)}
-                              style={btn.red}
-                              disabled={deletingComment}
-                            >
-                              <Text style={{ color: "#c00" }}>
-                                {deletingComment ? "삭제중..." : "삭제"}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-
-                        {isEditing && (
-                          <View
-                            style={{
-                              paddingHorizontal: 8,
-                              paddingVertical: 2,
-                              backgroundColor: "#eef",
-                              borderRadius: 6,
-                            }}
-                          >
-                            <Text style={{ color: "#335" }}>수정 중…</Text>
-                          </View>
-                        )}
+                    {isEditing && (
+                      <View style={styles.editTag}>
+                        <Text style={{ color: "#334155", fontSize: 12 }}>
+                          수정 중
+                        </Text>
                       </View>
-
-                      <Text style={styles.commentBody}>{c.body}</Text>
-                    </View>
+                    )}
                   </View>
-                );
-              })}
-            </View>
-          )}
-        </ScrollView>
 
-        {!editingCommentId && (
+                  <Text style={styles.commentBody}>{c.body}</Text>
+                </View>
+              </View>
+            );
+          }}
+          ListEmptyComponent={
+            <View style={{ alignItems: "center", paddingVertical: 18 }}>
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={32}
+                color="#CBD5E1"
+              />
+              <Text style={{ color: COLORS.sub, marginTop: 6 }}>
+                아직 댓글이 없어요.
+              </Text>
+            </View>
+          }
+          style={{ flex: 1, backgroundColor: COLORS.bg }}
+        />
+
+        {!editingCommentId ? (
           <View
             style={[
               styles.inputBar,
@@ -335,14 +385,14 @@ const PostDetailScreen = () => {
               onPress={submitComment}
               disabled={!commentText.trim() || adding}
             >
-              <Text style={styles.sendBtnText}>
-                {adding ? "등록중..." : "등록"}
-              </Text>
+              {adding ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Ionicons name="paper-plane" size={16} color="#fff" />
+              )}
             </TouchableOpacity>
           </View>
-        )}
-
-        {editingCommentId && (
+        ) : (
           <View
             style={[
               styles.editBar,
@@ -360,148 +410,237 @@ const PostDetailScreen = () => {
               autoFocus
             />
             <TouchableOpacity
+              style={[styles.cancelBtn, updatingComment && { opacity: 0.6 }]}
+              onPress={cancelEdit}
+              disabled={updatingComment}
+            >
+              <Text style={{ fontWeight: "700", color: COLORS.text }}>
+                취소
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[
-                styles.sendBtn,
-                (!editingText.trim() || updatingComment) && { opacity: 0.5 },
+                styles.saveBtn,
+                (!editingText.trim() || updatingComment) && { opacity: 0.6 },
               ]}
               onPress={saveEdit}
               disabled={!editingText.trim() || updatingComment}
             >
-              <Text style={styles.sendBtnText}>
-                {updatingComment ? "저장중..." : "저장"}
+              <Text style={{ color: "#fff", fontWeight: "800" }}>
+                {updatingComment ? "저장중…" : "저장"}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={cancelEdit}
-              disabled={updatingComment}
-            >
-              <Text style={{ fontWeight: "700" }}>취소</Text>
             </TouchableOpacity>
           </View>
         )}
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
-const btn = {
-  gray: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: "#eee",
-    borderRadius: 6,
-  } as const,
-  red: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: "#ffefef",
-    borderRadius: 6,
-  } as const,
-  grayLg: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#eee",
-    borderRadius: 8,
-  } as const,
-  redLg: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#ffefef",
-    borderRadius: 8,
-  } as const,
-};
-
 const styles = StyleSheet.create({
-  title: { fontSize: 20, fontWeight: "700", marginBottom: 6 },
-  meta: { color: "#666", marginBottom: 12 },
-  carouselWrap: { position: "relative", marginBottom: 12 },
-  image: { height: 320, borderRadius: 10 },
-  pageBadge: {
-    position: "absolute",
-    right: 10,
-    top: 10,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    borderRadius: 16,
+  root: { flex: 1, backgroundColor: COLORS.card },
+
+  header: {
+    height: 52,
+    backgroundColor: COLORS.card,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.line,
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    justifyContent: "space-between",
   },
-  pageBadgeText: { color: "#fff", fontWeight: "600" },
-  content: { fontSize: 16, lineHeight: 22 },
-  hr: { height: 1, backgroundColor: "#eee", marginVertical: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 10 },
-  empty: { color: "#888" },
-  commentRow: { flexDirection: "row", gap: 10 },
-  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#ddd" },
-  avatarFallback: {
-    backgroundColor: "#888",
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F9FAFB",
     alignItems: "center",
     justifyContent: "center",
   },
-  commentHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  commentAuthor: { fontWeight: "700" },
-  commentDate: { color: "#888", fontSize: 12 },
-  commentBody: { marginTop: 4, lineHeight: 20 },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "800",
+    color: COLORS.text,
+  },
 
-  barBase: {
+  contentWrap: { paddingHorizontal: 16, paddingTop: 12 },
+
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  authorAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#E5E7EB",
+  },
+  avatarFallback: {
+    backgroundColor: "#94A3B8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  metaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.chipBg,
+    paddingHorizontal: 10,
+    height: 26,
+    borderRadius: 13,
+  },
+  metaText: { fontSize: 12, color: COLORS.sub },
+
+  carouselCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(17,24,39,0.06)",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 2,
+    marginBottom: 12,
+  },
+  image: { height: 320 },
+  dotsRow: {
     position: "absolute",
+    bottom: 10,
     left: 0,
     right: 0,
-    bottom: 0,
     flexDirection: "row",
-    gap: 8,
-    padding: 12,
-    backgroundColor: "#fff",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#eee",
+    justifyContent: "center",
+    gap: 6,
   },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.5)",
+  },
+  dotActive: { backgroundColor: "#fff", width: 8, height: 8, borderRadius: 4 },
+
+  bodyText: { fontSize: 16, lineHeight: 24, color: "#1F2937", marginTop: 8 },
+
+  sectionDivider: {
+    height: 1,
+    backgroundColor: COLORS.line,
+    marginVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: COLORS.text,
+    paddingHorizontal: 0,
+    marginBottom: 8,
+  },
+
+  commentItem: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  commentAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#E5E7EB",
+  },
+  bubble: {
+    flex: 1,
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(17,24,39,0.06)",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 1,
+  },
+  commentTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  commentAuthor: { fontWeight: "800", color: COLORS.text },
+  commentDate: { color: COLORS.sub, fontSize: 12, marginLeft: 2, flex: 1 },
+  actionText: { fontSize: 12, color: COLORS.text, fontWeight: "700" },
+  editTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: "#E0E7FF",
+    borderRadius: 6,
+  },
+  commentBody: { lineHeight: 20, color: "#1F2937" },
 
   inputBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     flexDirection: "row",
     gap: 8,
     padding: 12,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.card,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#eee",
+    borderTopColor: COLORS.line,
   },
-
   editBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     flexDirection: "row",
     gap: 8,
     padding: 12,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.card,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#eee",
+    borderTopColor: COLORS.line,
   },
 
   input: {
     flex: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "rgba(17,24,39,0.08)",
+    borderRadius: 24,
+    paddingHorizontal: 14,
     paddingVertical: 10,
+    color: COLORS.text,
   },
   sendBtn: {
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: "#111",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.tint,
     alignItems: "center",
     justifyContent: "center",
   },
-  sendBtnText: { color: "#fff", fontWeight: "700" },
   cancelBtn: {
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#eee",
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  saveBtn: {
+    height: 44,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    backgroundColor: COLORS.tint,
     alignItems: "center",
     justifyContent: "center",
   },
