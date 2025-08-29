@@ -15,7 +15,7 @@ import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const qc = new QueryClient();
-const BAR_HEIGHT = 64;
+const BAR_HEIGHT = 30;
 const BG = "#F7FAFC";
 
 function LayoutInner() {
