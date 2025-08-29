@@ -3,7 +3,7 @@ import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const BAR_HEIGHT = 64;
+const BAR_HEIGHT = 30;
 const FAB_SIZE = 64;
 
 export default function BottomActionBar() {
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   fab: {
     width: FAB_SIZE, height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: '#111',
+    backgroundColor: '#ED8936',
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
