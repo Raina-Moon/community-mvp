@@ -3,7 +3,8 @@ import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const BAR_HEIGHT = 64;
+export const GLOBAL_BAR_HEIGHT = 30;          
+export const GLOBAL_BAR_MIN_BOTTOM = 12;
 const FAB_SIZE = 64;
 
 export default function BottomActionBar() {
@@ -25,8 +26,8 @@ export default function BottomActionBar() {
         style={[
           styles.bar,
           {
-            paddingBottom: Math.max(insets.bottom, 12),
-            height: BAR_HEIGHT + Math.max(insets.bottom, 12),
+            paddingBottom: Math.max(insets.bottom, GLOBAL_BAR_MIN_BOTTOM),
+            height: GLOBAL_BAR_HEIGHT + Math.max(insets.bottom, GLOBAL_BAR_MIN_BOTTOM),
           },
         ]}
       >
@@ -38,8 +39,11 @@ export default function BottomActionBar() {
         pointerEvents="box-none"
         style={[
           styles.fabWrap,
-          {
-            bottom: BAR_HEIGHT - FAB_SIZE / 2 + Math.max(insets.bottom, 12),
+         {
+            bottom:
+              GLOBAL_BAR_HEIGHT -
+              FAB_SIZE / 2 + // ✅ 요기!
+              Math.max(insets.bottom, GLOBAL_BAR_MIN_BOTTOM),
           },
         ]}
       >
@@ -71,10 +75,12 @@ const styles = StyleSheet.create({
     left: 0, right: 0,
     alignItems: 'center',
   },
-  fab: {
-    width: FAB_SIZE, height: FAB_SIZE,
+   fab: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: '#111',
+
+    backgroundColor: '#ED8936',
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({

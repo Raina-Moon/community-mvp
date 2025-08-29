@@ -11,18 +11,23 @@ export default function CreatePostScreen() {
   const user = useAuthStore((s) => s.user);
   const { mutateAsync, isPending } = useCreatePostMutation();
 
-  if (!user)
+  if (!user) {
     return (
       <LoginRequired
         redirectTo="/post/create"
         message="글을 작성하려면 로그인이 필요합니다."
       />
     );
+  }
+
   return (
     <PostEditor
       header="새 글 작성"
+      subHeader="오늘의 생각을 짧게라도 남겨보세요. 첫 이미지는 썸네일로 사용됩니다."
       submitLabel="작성하기"
+      cancelLabel="취소"
       isBusy={isPending}
+      onCancel={() => router.back()}
       onSubmit={async ({ title, content }, files) => {
         if (!title || !content) {
           Alert.alert("입력 확인", "제목과 내용을 입력하세요.");

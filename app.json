@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "community-mvp",
-    "slug": "community-mvp",
+    "name": "모두의 광장",
+    "slug": "모두의 광장",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": "communitymvp",
+    "scheme": "모두의 광장",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -15,7 +15,7 @@
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#F7FAFC"
       },
       "edgeToEdgeEnabled": true
     },

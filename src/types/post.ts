@@ -11,4 +11,5 @@ export type Post = {
   imageUrls: string[];   
   comments: Comment[];
   author?: User;        
+  commentsCount?: number;
 };
