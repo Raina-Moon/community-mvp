@@ -39,6 +39,8 @@ const Home = () => {
         data={data}
         keyExtractor={(p) => p.id}
         renderItem={({ item }) => <PostCard post={item} />}
+        ItemSeparatorComponent={() => <View style={{ height: 24 }} />}
+        overScrollMode="never"
       />
     </SafeAreaView>
   );
@@ -48,6 +50,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
+    backgroundColor: "#F7FAFC",
   },
   header: {
     flexDirection: "row",
