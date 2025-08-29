@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   TextInput,
@@ -16,6 +16,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, Href, useLocalSearchParams } from "expo-router";
 import { useAuthStore } from "../../src/store/auth";
+import { isUsernameAvailable } from "@/src/services/auth";
 
 const COLORS = {
   bg: "#F7FAFC",
@@ -28,6 +29,8 @@ const COLORS = {
   danger: "#DC2626",
   success: "#16A34A",
   warn: "#F59E0B",
+  okBorder: "rgba(22,163,74,0.35)",
+  errBorder: "rgba(220,38,38,0.35)",
 };
 
 export default function SignUpScreen() {
@@ -43,6 +46,11 @@ export default function SignUpScreen() {
   const [showPw1, setShowPw1] = useState(false);
   const [showPw2, setShowPw2] = useState(false);
 
+  const [nameChecking, setNameChecking] = useState(false);
+  const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
+
+  const [emailTaken, setEmailTaken] = useState(false);
+
   const userRef = useRef<TextInput>(null);
   const pwRef = useRef<TextInput>(null);
   const pw2Ref = useRef<TextInput>(null);
@@ -50,8 +58,15 @@ export default function SignUpScreen() {
   const emailTrim = email.trim();
   const usernameTrim = username.trim();
 
-  const isEmailValid = useMemo(() => /^\S+@\S+\.\S+$/.test(emailTrim), [emailTrim]);
-  const isUsernameValid = useMemo(() => usernameTrim.length >= 2 && usernameTrim.length <= 20, [usernameTrim]);
+  const isEmailValid = useMemo(
+    () => /^\S+@\S+\.\S+$/.test(emailTrim),
+    [emailTrim]
+  );
+  const isUsernameValid = useMemo(
+    () => usernameTrim.length >= 2 && usernameTrim.length <= 20,
+    [usernameTrim]
+  );
+
   const passwordStrength = useMemo(() => {
     let score = 0;
     if (password.length >= 8) score++;
@@ -63,19 +78,60 @@ export default function SignUpScreen() {
     if (score === 3) return { label: "보통", color: COLORS.warn };
     return { label: "강함", color: COLORS.success };
   }, [password]);
+
   const isPasswordOk = password.length >= 8;
   const isMatch = password2.length > 0 && password === password2;
 
-  const canSubmit = isEmailValid && isUsernameValid && isPasswordOk && isMatch && !submitting;
+  const canSubmit =
+    isEmailValid &&
+    isUsernameValid &&
+    nameAvailable === true &&
+    isPasswordOk &&
+    isMatch &&
+    !submitting &&
+    !emailTaken;
+
+  useEffect(() => {
+    setNameAvailable(null);
+    if (!isUsernameValid) {
+      setNameChecking(false);
+      return;
+    }
+    let canceled = false;
+    setNameChecking(true);
+    const t = setTimeout(async () => {
+      try {
+        const ok = await isUsernameAvailable(usernameTrim);
+        if (!canceled) setNameAvailable(ok);
+      } catch {
+        if (!canceled) setNameAvailable(null);
+      } finally {
+        if (!canceled) setNameChecking(false);
+      }
+    }, 400);
+    return () => {
+      canceled = true;
+      clearTimeout(t);
+    };
+  }, [usernameTrim, isUsernameValid]);
 
   const onSubmit = async () => {
     if (!canSubmit) {
-      if (!isEmailValid) return Alert.alert("입력 확인", "올바른 이메일을 입력하세요.");
-      if (!isUsernameValid) return Alert.alert("입력 확인", "닉네임은 2~20자로 입력하세요.");
-      if (!isPasswordOk) return Alert.alert("입력 확인", "비밀번호는 8자 이상이어야 합니다.");
-      if (!isMatch) return Alert.alert("입력 확인", "비밀번호가 일치하지 않습니다.");
+      if (!isEmailValid)
+        return Alert.alert("입력 확인", "올바른 이메일을 입력하세요.");
+      if (!isUsernameValid)
+        return Alert.alert("입력 확인", "닉네임은 2~20자로 입력하세요.");
+      if (nameAvailable !== true)
+        return Alert.alert("입력 확인", "이미 사용 중인 닉네임입니다.");
+      if (!isPasswordOk)
+        return Alert.alert("입력 확인", "비밀번호는 8자 이상이어야 합니다.");
+      if (!isMatch)
+        return Alert.alert("입력 확인", "비밀번호가 일치하지 않습니다.");
+      if (emailTaken)
+        return Alert.alert("입력 확인", "이미 사용 중인 이메일입니다.");
       return;
     }
+
     setSubmitting(true);
     try {
       await signUp(emailTrim, password, usernameTrim);
@@ -85,29 +141,66 @@ export default function SignUpScreen() {
         router.replace("/" as Href);
       }
     } catch (e: any) {
-      Alert.alert("회원가입 실패", e?.message ?? "다시 시도해 주세요.");
+      if (e?.code === "EMAIL_TAKEN") {
+        setEmailTaken(true);
+        Alert.alert("회원가입 실패", "이미 사용 중인 이메일입니다.");
+      } else if (e?.code === "USERNAME_TAKEN") {
+        setNameAvailable(false);
+        Alert.alert("회원가입 실패", "이미 사용 중인 닉네임입니다.");
+      } else {
+        Alert.alert(
+          "회원가입 실패",
+          String(e?.message ?? "다시 시도해 주세요.")
+        );
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
+  const emailError = (email.length > 0 && !isEmailValid) || emailTaken;
+  const emailOk = email.length > 0 && isEmailValid && !emailTaken;
+
+  const nameError =
+    username.length > 0 &&
+    (!isUsernameValid || (nameAvailable === false && !nameChecking));
+  const nameOk =
+    username.length > 0 &&
+    isUsernameValid &&
+    nameAvailable === true &&
+    !nameChecking;
+
   return (
     <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
       <StatusBar style="dark" backgroundColor={COLORS.bg} translucent={false} />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
         <View style={styles.container}>
           <View style={styles.topBar}>
             <Text style={styles.brand}>모두의 광장</Text>
-            <TouchableOpacity onPress={() => router.replace("/")} style={styles.topIconBtn}>
+            <TouchableOpacity
+              onPress={() => router.replace("/")}
+              style={styles.topIconBtn}
+            >
               <Ionicons name="home-outline" size={20} color={COLORS.tint} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.card}>
             <Text style={styles.title}>회원가입</Text>
-            <Text style={styles.subtitle}>계정을 만들고 지금 바로 시작해 보세요.</Text>
+            <Text style={styles.subtitle}>
+              계정을 만들고 지금 바로 시작해 보세요.
+            </Text>
 
-            <View style={styles.inputWrap}>
+            <View
+              style={[
+                styles.inputWrap,
+                emailOk && { borderColor: COLORS.okBorder },
+                emailError && { borderColor: COLORS.errBorder },
+              ]}
+            >
               <Ionicons name="mail-outline" size={16} color={COLORS.sub} />
               <TextInput
                 style={styles.input}
@@ -119,21 +212,44 @@ export default function SignUpScreen() {
                 textContentType="emailAddress"
                 autoComplete="email"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  if (emailTaken) setEmailTaken(false);
+                }}
                 returnKeyType="next"
                 onSubmitEditing={() => userRef.current?.focus()}
                 autoFocus
               />
-              {email.length > 0 && (
+              {email.length > 0 && !emailTaken && (
                 <Ionicons
                   name={isEmailValid ? "checkmark-circle" : "close-circle"}
                   size={18}
                   color={isEmailValid ? COLORS.success : COLORS.danger}
                 />
               )}
+              {emailTaken && (
+                <Ionicons name="close-circle" size={18} color={COLORS.danger} />
+              )}
             </View>
+            {emailTaken && (
+              <Text
+                style={[
+                  styles.hintText,
+                  { color: COLORS.danger, marginTop: 6 },
+                ]}
+              >
+                이미 사용 중인 이메일입니다.
+              </Text>
+            )}
 
-            <View style={[styles.inputWrap, { marginTop: 10 }]}>
+            <View
+              style={[
+                styles.inputWrap,
+                { marginTop: 10 },
+                nameOk && { borderColor: COLORS.okBorder },
+                nameError && { borderColor: COLORS.errBorder },
+              ]}
+            >
               <Ionicons name="person-outline" size={16} color={COLORS.sub} />
               <TextInput
                 ref={userRef}
@@ -146,17 +262,35 @@ export default function SignUpScreen() {
                 returnKeyType="next"
                 onSubmitEditing={() => pwRef.current?.focus()}
               />
-              {username.length > 0 && (
+              {nameChecking ? (
+                <ActivityIndicator size="small" />
+              ) : username.length > 0 ? (
                 <Ionicons
-                  name={isUsernameValid ? "checkmark-circle" : "close-circle"}
+                  name={nameOk ? "checkmark-circle" : "close-circle"}
                   size={18}
-                  color={isUsernameValid ? COLORS.success : COLORS.danger}
+                  color={nameOk ? COLORS.success : COLORS.danger}
                 />
-              )}
+              ) : null}
             </View>
+            {username.length > 0 &&
+              nameAvailable === false &&
+              !nameChecking && (
+                <Text
+                  style={[
+                    styles.hintText,
+                    { color: COLORS.danger, marginTop: 6 },
+                  ]}
+                >
+                  이미 사용 중인 닉네임입니다.
+                </Text>
+              )}
 
             <View style={[styles.inputWrap, { marginTop: 10 }]}>
-              <Ionicons name="lock-closed-outline" size={16} color={COLORS.sub} />
+              <Ionicons
+                name="lock-closed-outline"
+                size={16}
+                color={COLORS.sub}
+              />
               <TextInput
                 ref={pwRef}
                 style={styles.input}
@@ -170,15 +304,29 @@ export default function SignUpScreen() {
                 returnKeyType="next"
                 onSubmitEditing={() => pw2Ref.current?.focus()}
               />
-              <TouchableOpacity onPress={() => setShowPw1((v) => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name={showPw1 ? "eye-off-outline" : "eye-outline"} size={18} color="#9CA3AF" />
+              <TouchableOpacity
+                onPress={() => setShowPw1((v) => !v)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name={showPw1 ? "eye-off-outline" : "eye-outline"}
+                  size={18}
+                  color="#9CA3AF"
+                />
               </TouchableOpacity>
             </View>
 
             {password.length > 0 && (
               <View style={styles.hintRow}>
-                <View style={[styles.dot, { backgroundColor: passwordStrength.color }]} />
-                <Text style={[styles.hintText, { color: passwordStrength.color }]}>
+                <View
+                  style={[
+                    styles.dot,
+                    { backgroundColor: passwordStrength.color },
+                  ]}
+                />
+                <Text
+                  style={[styles.hintText, { color: passwordStrength.color }]}
+                >
                   비밀번호 강도: {passwordStrength.label}
                 </Text>
               </View>
@@ -198,12 +346,24 @@ export default function SignUpScreen() {
                 returnKeyType="go"
                 onSubmitEditing={onSubmit}
               />
-              <TouchableOpacity onPress={() => setShowPw2((v) => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name={showPw2 ? "eye-off-outline" : "eye-outline"} size={18} color="#9CA3AF" />
+              <TouchableOpacity
+                onPress={() => setShowPw2((v) => !v)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name={showPw2 ? "eye-off-outline" : "eye-outline"}
+                  size={18}
+                  color="#9CA3AF"
+                />
               </TouchableOpacity>
             </View>
             {password2.length > 0 && !isMatch && (
-              <Text style={[styles.hintText, { color: COLORS.danger, marginTop: 6 }]}>
+              <Text
+                style={[
+                  styles.hintText,
+                  { color: COLORS.danger, marginTop: 6 },
+                ]}
+              >
                 비밀번호가 일치하지 않습니다.
               </Text>
             )}
@@ -213,12 +373,16 @@ export default function SignUpScreen() {
               android_ripple={{ color: "rgba(0,0,0,0.06)" }}
               style={({ pressed }) => [
                 styles.btn,
-                (pressed && Platform.OS === "ios") ? { opacity: 0.95 } : null,
+                pressed && Platform.OS === "ios" ? { opacity: 0.95 } : null,
                 !canSubmit && { opacity: 0.6 },
               ]}
               disabled={!canSubmit}
             >
-              {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>가입하기</Text>}
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.btnText}>가입하기</Text>
+              )}
             </Pressable>
 
             <View style={styles.footer}>
@@ -230,7 +394,11 @@ export default function SignUpScreen() {
                   activeOpacity={0.9}
                   style={styles.ghostBtn}
                 >
-                  <Ionicons name="log-in-outline" size={16} color={COLORS.tint} />
+                  <Ionicons
+                    name="log-in-outline"
+                    size={16}
+                    color={COLORS.tint}
+                  />
                   <Text style={styles.ghostBtnText}>로그인</Text>
                 </TouchableOpacity>
               </View>
@@ -244,30 +412,60 @@ export default function SignUpScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 12, justifyContent: "center" },
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    justifyContent: "center",
+  },
 
   topBar: {
-    position: "absolute", top: 0, left: 0, right: 0, height: 48,
-    paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 48,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   brand: { fontSize: 16, fontWeight: "800", color: COLORS.text },
   topIconBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: "#F9FAFB", alignItems: "center", justifyContent: "center",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F9FAFB",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   card: {
-    backgroundColor: COLORS.card, borderRadius: 16, padding: 18,
-    borderWidth: 1, borderColor: "rgba(17,24,39,0.06)",
-    shadowColor: "#000", shadowOpacity: 0.06, shadowOffset: { width: 0, height: 8 }, shadowRadius: 16, elevation: 2,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(17,24,39,0.06)",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 2,
   },
   title: { fontSize: 22, fontWeight: "800", color: COLORS.text },
   subtitle: { marginTop: 6, fontSize: 13, color: COLORS.sub },
 
   inputWrap: {
-    marginTop: 16, flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: COLORS.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 48,
-    borderWidth: 1, borderColor: "rgba(17,24,39,0.05)",
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.inputBg,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+    borderWidth: 1,
+    borderColor: "rgba(17,24,39,0.05)",
   },
   input: { flex: 1, fontSize: 16, color: COLORS.text },
 
@@ -276,20 +474,35 @@ const styles = StyleSheet.create({
   hintText: { fontSize: 12 },
 
   btn: {
-    marginTop: 16, backgroundColor: COLORS.tint, height: 48, borderRadius: 12,
-    alignItems: "center", justifyContent: "center",
+    marginTop: 16,
+    backgroundColor: COLORS.tint,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   btnText: { color: "#fff", fontWeight: "800", fontSize: 16 },
 
   footer: { marginTop: 18 },
   divider: { height: 1, backgroundColor: "rgba(17,24,39,0.06)" },
-  bottomRow: { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  bottomRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   subtleText: { fontSize: 12, color: COLORS.sub },
 
   ghostBtn: {
-    paddingHorizontal: 14, height: 40, borderRadius: 10,
-    backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: COLORS.line,
-    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 14,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   ghostBtnText: { color: COLORS.text, fontWeight: "800", fontSize: 13 },
 });
