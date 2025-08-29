@@ -44,6 +44,16 @@ export async function listPostsSimple(page = 1, size = 10): Promise<Post[]> {
     .in("id", authorIds);
   const authorMap = new Map((authors ?? []).map((a) => [a.id, a]));
 
+  const { data: countsRows, error: cntErr } = await supabase
+    .from("post_comment_counts")
+    .select("post_id,comments_count")
+    .in("post_id", postIds);
+  if (cntErr) throw cntErr;
+
+  const countMap = new Map<string, number>(
+    (countsRows ?? []).map((r: any) => [r.post_id, r.comments_count ?? 0])
+  );
+
   return bases.map((base) => {
     const path = latestPathByPost.get(base.id);
     const firstUrl = path
@@ -56,6 +66,7 @@ export async function listPostsSimple(page = 1, size = 10): Promise<Post[]> {
       author: author ? toUser(author) : undefined,
       imageUrls: firstUrl ? [firstUrl] : [],
       comments: [],
+      commentsCount: countMap.get(base.id) || 0,
     };
     return post;
   });
